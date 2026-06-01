@@ -243,6 +243,10 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage(self.i18n.tr("status_ready"))
         
+        self.lbl_credit = QLabel()
+        self.lbl_credit.setStyleSheet("color: #8B949E; font-size: 11px; margin-right: 8px;")
+        self.status_bar.addPermanentWidget(self.lbl_credit)
+        
         self.retranslate_ui()
 
     def toggle_lang(self):
@@ -271,6 +275,9 @@ class MainWindow(QMainWindow):
             self.lbl_title.setText(self.i18n.tr("lbl_no_track"))
         self.status_bar.showMessage(self.i18n.tr("status_ready"))
         
+        if hasattr(self, 'lbl_credit'):
+            self.lbl_credit.setText("Developed by Patcharakan Todkaew" if self.i18n.lang == "en" else "พัฒนาโดย พัชรกานต์ ต๊อดแก้ว")
+            
         if hasattr(self.playlist_widget, 'retranslate_ui'):
             self.playlist_widget.retranslate_ui(self.i18n)
         if hasattr(self.scheduler_widget, 'retranslate_ui'):
