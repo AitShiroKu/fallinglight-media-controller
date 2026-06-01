@@ -1,0 +1,6 @@
+PySide6>=6.4.0
+python-vlc>=3.0.18121
+yt-dlp>=2023.3.3
+APScheduler>=3.10.0
+pyinstaller>=5.13.0
+tzdata

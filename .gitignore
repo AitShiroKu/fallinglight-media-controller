@@ -1,0 +1,25 @@
+# Python Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller
+*.spec
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE / Editor Settings
+.vscode/
+.idea/
+.directory
+.DS_Store
+
+# Local App Data / Database Files
+settings.json
+schedules.json
+.antigravitycli/
