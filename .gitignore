@@ -1,25 +1,42 @@
-# Python Bytecode
-__pycache__/
-*.py[cod]
-*$py.class
+# dependencies (bun install)
+node_modules
 
-# PyInstaller
-*.spec
+# output
+out
+dist
+*.tgz
 
-# Environments
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
 .env
-.venv
-env/
-venv/
-ENV/
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
 
-# IDE / Editor Settings
-.vscode/
-.idea/
-.directory
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
 .DS_Store
 
-# Local App Data / Database Files
-settings.json
-schedules.json
-.antigravitycli/
+# Uploads and local data
+uploads/
+data/*.json
+!data/.gitkeep
+.agents/
+.godkiller/
+.pytest_cache/

@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FallingLight Media Controller</title>
+  <meta name="description" content="Web-based media controller for school public relations rooms">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: { 900: '#0d1117', 800: '#161b22', 700: '#1c2333', 600: '#21283b', 500: '#2a3352' },
+            accent: { DEFAULT: '#e94560', light: '#ff6b81', dark: '#b8354d', glow: 'rgba(233,69,96,0.3)' },
+            muted: '#8b949e',
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans Thai', 'Segoe UI', 'Tahoma', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Cascadia Code', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #161b22; }
+    ::-webkit-scrollbar-thumb { background: #2a3352; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #e94560; }
+    input[type="range"] { -webkit-appearance: none; background: transparent; }
+    input[type="range"]::-webkit-slider-runnable-track { height: 6px; background: #1c2333; border-radius: 3px; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #e94560; margin-top: -5px; cursor: pointer; }
+    input[type="range"]::-webkit-slider-thumb:hover { background: #ff6b81; transform: scale(1.15); }
+    .vu-bar { transition: height 0.08s ease-out; }
+    .tab-btn.active { border-color: #e94560; color: #e94560; }
+    .drag-over { outline: 2px dashed #e94560; outline-offset: -4px; background: rgba(233,69,96,0.05) !important; }
+    .playlist-row.playing { background: rgba(233,69,96,0.12) !important; }
+    .playlist-row:hover { background: rgba(42,51,82,0.6) !important; }
+    .mic-pulse { animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(233,69,96,0.5); } 50% { box-shadow: 0 0 0 12px rgba(233,69,96,0); } }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .modal-backdrop { backdrop-filter: blur(4px); }
+    .pulse-waiting { animation: pulseWait 2s ease-in-out infinite; }
+    @keyframes pulseWait { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* Responsive Styles for Mobile/Tablet */
+    @media (max-width: 900px) {
+      #app-screen {
+        height: auto !important;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      main {
+        overflow: visible !important;
+        flex: 1 0 auto !important;
+      }
+      .tab-content {
+        height: auto !important;
+      }
+      
+      /* Player Tab */
+      #tab-player {
+        flex-direction: column !important;
+        padding: 0.75rem !important;
+        gap: 0.75rem !important;
+      }
+      #tab-player > div:first-child {
+        width: 100% !important;
+        flex-shrink: 1 !important;
+      }
+      #tab-player > div:last-child {
+        width: 100% !important;
+        height: 400px !important;
+        flex-shrink: 0 !important;
+      }
+
+      /* Files Tab Layout */
+      #tab-files {
+        padding: 0.75rem !important;
+        gap: 0.75rem !important;
+      }
+      #tab-files > div:last-child {
+        height: 350px !important;
+        flex-shrink: 0 !important;
+      }
+
+      /* Schedule Tab Layout */
+      #tab-schedule {
+        padding: 0.75rem !important;
+        gap: 0.75rem !important;
+      }
+      #tab-schedule > div:last-child {
+        height: 350px !important;
+        flex-shrink: 0 !important;
+      }
+
+      /* Settings Tab Layout */
+      #tab-settings {
+        padding: 1rem !important;
+        height: auto !important;
+      }
+    }
+
+    @media (max-width: 640px) {
+      header {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        gap: 0.5rem !important;
+      }
+      header h1 {
+        font-size: 1rem !important;
+      }
+      #btn-lang, #btn-streaming, #btn-logout {
+        padding: 0.25rem 0.5rem !important;
+        font-size: 10px !important;
+      }
+      nav {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+      }
+      nav button {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+        font-size: 13px !important;
+        flex: 1;
+        text-align: center;
+      }
+      #modal-content {
+        margin-left: 1rem;
+        margin-right: 1rem;
+        padding: 1rem !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-dark-900 text-gray-200 min-h-screen">
+
+  <!-- ════════════════════════ LOGIN SCREEN ════════════════════════ -->
+  <div id="login-screen" class="flex items-center justify-center min-h-screen">
+    <div class="bg-dark-800 border border-dark-500 rounded-2xl p-8 w-full max-w-md shadow-2xl fade-in">
+      <div class="text-center mb-8">
+        <div class="text-5xl mb-3">🎛</div>
+        <h1 class="text-2xl font-bold text-accent">FallingLight</h1>
+        <p class="text-muted text-sm mt-1" data-i18n="login_subtitle">Media Controller — PR Room</p>
+      </div>
+      <form id="login-form" action="javascript:void(0);" onsubmit="return false;" class="space-y-6">
+        <div>
+          <label class="block text-sm text-muted mb-1" data-i18n="label_username">Username</label>
+          <input id="login-user" type="text" autocomplete="username"
+            class="w-full bg-dark-900 border border-dark-500 rounded-lg px-4 py-3 text-gray-200 focus:border-accent focus:outline-none transition" placeholder="admin">
+        </div>
+        <div>
+          <label class="block text-sm text-muted mb-1" data-i18n="label_password">Password</label>
+          <input id="login-pass" type="password" autocomplete="current-password"
+            class="w-full bg-dark-900 border border-dark-500 rounded-lg px-4 py-3 text-gray-200 focus:border-accent focus:outline-none transition" placeholder="••••••••">
+        </div>
+        <div id="login-error" class="text-accent text-sm text-center hidden"></div>
+        <button type="submit"
+          class="w-full bg-accent hover:bg-accent-light text-white font-bold py-3 rounded-lg transition transform hover:scale-[1.02] active:scale-[0.98]"
+          data-i18n="btn_login">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ════════════════════════ MAIN APP ════════════════════════ -->
+  <div id="app-screen" class="hidden flex flex-col h-screen">
+
+    <!-- Red Warning Banner -->
+    <div id="pr-warning-banner" class="bg-red-600/90 text-white px-6 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-red-500 flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="text-sm animate-pulse">⚠️</span>
+        <span data-i18n="pr_warning_text">ระบบนี้จำเป็นต้องใช้ในห้องประชาสัมพันธ์ และต้องทำงานตลอดเวลา (ห้ามปิดหน้าเว็บหรือออกจากระบบ)</span>
+      </div>
+      <button onclick="document.getElementById('pr-warning-banner').classList.add('hidden')" class="text-white/80 hover:text-white text-xs px-2 py-0.5 rounded hover:bg-red-700 transition" title="ซ่อนชั่วคราว">✕</button>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-dark-800 border-b border-dark-500 px-6 py-3 flex items-center gap-4 flex-shrink-0">
+      <span class="text-xl">🎛</span>
+      <h1 class="text-lg font-bold text-accent">FallingLight</h1>
+      <span class="text-muted text-sm hidden sm:inline" data-i18n="header_subtitle">Media Controller</span>
+      <div class="flex-1"></div>
+      <button id="btn-lang" onclick="window.appI18n.toggle()"
+        class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs font-bold hover:border-accent transition">TH</button>
+      <div class="flex items-center gap-2">
+        <button id="btn-streaming" onclick="window.streamController.toggle()"
+          class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent hover:text-accent transition">
+          📡 <span data-i18n="streaming_enable">Streaming</span>
+        </button>
+        <span id="streaming-badge" class="hidden text-xs text-yellow-400 font-bold"></span>
+      </div>
+      <button id="btn-logout" onclick="window.appAuth.logout()"
+        class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent hover:text-accent transition"
+        data-i18n="btn_logout">Logout</button>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="bg-dark-800 px-6 flex gap-1 border-b border-dark-500 flex-shrink-0">
+      <button class="tab-btn active px-5 py-3 text-sm font-medium border-b-2 border-transparent hover:text-accent transition" data-tab="player">
+        🎵 <span data-i18n="tab_player">Player</span>
+      </button>
+      <button class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent hover:text-accent transition" data-tab="schedule">
+        📅 <span data-i18n="tab_schedule">Schedule</span>
+      </button>
+      <button class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent hover:text-accent transition" data-tab="files">
+        📁 <span data-i18n="tab_files">Files</span>
+      </button>
+      <button class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent hover:text-accent transition" data-tab="settings">
+        ⚙️ <span data-i18n="tab_settings">Settings</span>
+      </button>
+    </nav>
+
+    <!-- Tab Content -->
+    <main class="flex-1 overflow-hidden">
+
+      <!-- ──── PLAYER TAB ──── -->
+      <div id="tab-player" class="tab-content h-full flex gap-4 p-4">
+
+        <!-- Left: Player Controls -->
+        <div class="bg-dark-800 border border-dark-500 rounded-xl p-5 flex flex-col gap-4 w-[420px] flex-shrink-0">
+
+          <!-- Now Playing -->
+          <div class="text-center">
+            <div id="track-title" class="text-lg font-bold truncate" data-i18n="no_track">No Track Loaded</div>
+            <div id="track-source" class="text-xs text-muted mt-1"></div>
+          </div>
+
+          <!-- VU Meters + Progress -->
+          <div class="flex items-end gap-3">
+            <!-- VU Left -->
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-5 h-32 bg-dark-900 rounded border border-dark-500 overflow-hidden flex flex-col-reverse">
+                <div id="vu-left" class="vu-bar w-full rounded" style="height:0%;background:linear-gradient(to top,#3fb950 60%,#d29922 80%,#e94560 100%)"></div>
+              </div>
+              <span class="text-[10px] text-muted">L</span>
+            </div>
+            <!-- VU Right -->
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-5 h-32 bg-dark-900 rounded border border-dark-500 overflow-hidden flex flex-col-reverse">
+                <div id="vu-right" class="vu-bar w-full rounded" style="height:0%;background:linear-gradient(to top,#3fb950 60%,#d29922 80%,#e94560 100%)"></div>
+              </div>
+              <span class="text-[10px] text-muted">R</span>
+            </div>
+            <!-- Progress + Time -->
+            <div class="flex-1 flex flex-col gap-2">
+              <input id="seek-bar" type="range" min="0" max="1000" value="0" class="w-full cursor-pointer" oninput="window.audioEngine.seekTo(this.value/1000)">
+              <div class="flex justify-between text-xs text-muted font-mono">
+                <span id="time-current">0:00</span>
+                <span id="time-total">0:00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transport -->
+          <div class="flex items-center justify-center gap-3">
+            <button onclick="window.playlist.previous()" class="w-10 h-10 rounded-full bg-dark-600 hover:bg-dark-500 transition text-lg" title="Previous">⏮</button>
+            <button onclick="window.audioEngine.stopWithFade()" class="w-10 h-10 rounded-full bg-dark-600 hover:bg-dark-500 transition text-lg" title="Stop">⏹</button>
+            <button id="btn-play" onclick="window.playlist.togglePlay()" class="w-14 h-14 rounded-full bg-accent hover:bg-accent-light transition text-2xl text-white" title="Play">▶</button>
+            <button onclick="window.playlist.next()" class="w-10 h-10 rounded-full bg-dark-600 hover:bg-dark-500 transition text-lg" title="Next">⏭</button>
+          </div>
+
+          <!-- Volume + Mic -->
+          <div class="flex items-center gap-3">
+            <button id="btn-mute" onclick="window.audioEngine.toggleMute()" class="text-lg w-8">🔊</button>
+            <input id="vol-slider" type="range" min="0" max="100" value="80" class="flex-1" oninput="window.audioEngine.setVolume(this.value/100)">
+            <span id="vol-label" class="text-xs text-muted font-mono w-10 text-right">80%</span>
+          </div>
+          <button id="btn-mic" onclick="window.audioEngine.toggleDuck()"
+            class="w-full py-3 rounded-xl border-2 border-yellow-500 text-yellow-400 font-bold text-lg hover:bg-yellow-500/10 transition">
+            🎙 <span data-i18n="btn_mic">MIC / PR</span>
+          </button>
+        </div>
+
+        <!-- Right: Playlist -->
+        <div class="flex-1 bg-dark-800 border border-dark-500 rounded-xl p-4 flex flex-col gap-3 overflow-hidden">
+          <!-- Playlist Header -->
+          <div class="flex items-center gap-3">
+            <h2 class="text-sm font-bold text-accent flex-1" data-i18n="playlist_title">Playlist</h2>
+            <label class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent transition cursor-pointer flex items-center gap-1">
+              ⬆️ <span data-i18n="btn_upload_add">Upload & Add</span>
+              <input type="file" multiple accept=".mp3,.mp4,.wav,.flac,.ogg,.m4a,.aac,.wma,.avi,.mkv,.webm" class="hidden" onchange="window.playlist.uploadAndAdd(this.files)">
+            </label>
+            <button onclick="window.playlist.addFromFiles()"
+              class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent transition">
+              📁 <span data-i18n="btn_add_file">Add File</span>
+            </button>
+            <button onclick="window.playlist.clearAll()"
+              class="px-3 py-1.5 bg-dark-600 border border-accent/50 rounded-lg text-xs text-accent hover:bg-accent/10 transition">
+              🗑 <span data-i18n="btn_clear">Clear</span>
+            </button>
+          </div>
+          <!-- Playlist Table -->
+          <div class="flex-1 overflow-auto rounded-lg border border-dark-500">
+            <table class="w-full text-sm">
+              <thead class="bg-dark-700 sticky top-0 z-10">
+                <tr class="text-muted text-xs uppercase">
+                  <th class="px-3 py-2 text-left w-8">#</th>
+                  <th class="px-3 py-2 text-left" data-i18n="col_title">Title</th>
+                  <th class="px-3 py-2 text-center w-16" data-i18n="col_loop">Loop</th>
+                  <th class="px-3 py-2 text-center w-12" data-i18n="col_left">Left</th>
+                  <th class="px-3 py-2 text-center w-16" data-i18n="col_actions">Act</th>
+                </tr>
+              </thead>
+              <tbody id="playlist-body" class="divide-y divide-dark-500">
+                <tr><td colspan="5" class="px-3 py-8 text-center text-muted text-xs" data-i18n="playlist_empty">Playlist is empty — add tracks to begin</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="playlist-info" class="text-xs text-muted"></div>
+        </div>
+      </div>
+
+      <!-- ──── SCHEDULE TAB ──── -->
+      <div id="tab-schedule" class="tab-content hidden h-full p-4 flex flex-col gap-4">
+        <div class="flex items-center gap-3">
+          <h2 class="text-sm font-bold text-accent flex-1" data-i18n="schedule_title">Scheduled Playback</h2>
+          <button onclick="window.schedulerUI.openAdd()"
+            class="px-4 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-lg transition">
+            ➕ <span data-i18n="btn_add_schedule">Add Schedule</span>
+          </button>
+          <button onclick="window.schedulerUI.exportJSON()"
+            class="px-3 py-2 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent transition">
+            📤 <span data-i18n="btn_export">Export</span>
+          </button>
+          <label class="px-3 py-2 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent transition cursor-pointer">
+            📥 <span data-i18n="btn_import">Import</span>
+            <input type="file" accept=".json" class="hidden" onchange="window.schedulerUI.importJSON(this.files[0])">
+          </label>
+        </div>
+        <div class="flex-1 overflow-auto rounded-xl border border-dark-500">
+          <table class="w-full text-sm">
+            <thead class="bg-dark-700 sticky top-0 z-10">
+              <tr class="text-muted text-xs uppercase">
+                <th class="px-3 py-2 w-12" data-i18n="col_enabled">On</th>
+                <th class="px-3 py-2 text-left" data-i18n="col_name">Name</th>
+                <th class="px-3 py-2 text-center" data-i18n="col_schedule">Schedule</th>
+                <th class="px-3 py-2 text-left" data-i18n="col_media">Media</th>
+                <th class="px-3 py-2 text-center w-20" data-i18n="col_vol">Vol</th>
+                <th class="px-3 py-2 text-center w-16" data-i18n="col_loop">Loop</th>
+                <th class="px-3 py-2 text-center w-28" data-i18n="col_actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="schedule-body" class="divide-y divide-dark-500">
+              <tr><td colspan="7" class="px-3 py-8 text-center text-muted text-xs" data-i18n="no_schedules">No schedules configured</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ──── FILES TAB ──── -->
+      <div id="tab-files" class="tab-content hidden h-full p-4 flex flex-col gap-4">
+        <div class="flex items-center gap-3">
+          <h2 class="text-sm font-bold text-accent flex-1" data-i18n="files_title">Media Files</h2>
+          <input id="files-search" type="text"
+            class="w-48 bg-dark-900 border border-dark-500 rounded-lg px-3 py-2 text-sm focus:border-accent focus:outline-none"
+            placeholder="Search files..." data-i18n="search_files_placeholder"
+            oninput="window.fileManager.search(this.value)">
+          <label id="upload-btn"
+            class="px-4 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-lg transition cursor-pointer">
+            ⬆ <span data-i18n="btn_upload">Upload</span>
+            <input type="file" multiple accept=".mp3,.mp4,.wav,.flac,.ogg,.m4a,.aac,.wma,.avi,.mkv,.webm" class="hidden" onchange="window.fileManager.upload(this.files)">
+          </label>
+        </div>
+        <!-- Upload drop zone + YouTube Downloader layout -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Left: Drag & Drop upload -->
+          <div id="drop-zone"
+            class="border-2 border-dashed border-dark-500 rounded-xl p-6 text-center text-muted text-sm hover:border-accent/50 transition flex flex-col justify-center min-h-[120px]"
+            data-i18n="drop_zone_text">
+            Drag & drop files here or click Upload above
+          </div>
+          <!-- Right: YouTube Downloader -->
+          <div class="bg-dark-800 border border-dark-500 rounded-xl p-5 flex flex-col justify-center gap-3">
+            <h3 class="text-sm font-bold text-accent" data-i18n="youtube_title">YouTube Downloader</h3>
+            <div class="flex gap-2">
+              <input id="yt-url" type="text" class="flex-1 bg-dark-900 border border-dark-500 rounded-lg px-3 py-2 text-sm focus:border-accent focus:outline-none" placeholder="Paste YouTube URL here..." data-i18n="youtube_placeholder">
+              <button onclick="window.youtubeDownloader.fetch()" class="px-4 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-lg transition" data-i18n="btn_fetch_youtube">Download Audio</button>
+            </div>
+            <div id="yt-status" class="text-xs text-accent hidden"></div>
+            <!-- YouTube Progress Bar -->
+            <div id="yt-progress-container" class="hidden mt-1">
+              <div class="flex justify-between text-xs text-accent mb-1">
+                <span id="yt-status-text" data-i18n="youtube_loading">Downloading...</span>
+                <span id="yt-percent">0%</span>
+              </div>
+              <div class="w-full bg-dark-900 rounded-full h-2 border border-dark-500 overflow-hidden">
+                <div id="yt-progress-bar" class="bg-accent h-2 rounded-full transition-all duration-200" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- File list -->
+        <div class="flex-1 overflow-auto rounded-xl border border-dark-500">
+          <table class="w-full text-sm">
+            <thead class="bg-dark-700 sticky top-0 z-10">
+              <tr class="text-muted text-xs uppercase">
+                <th class="px-3 py-2 text-left" data-i18n="col_filename">Filename</th>
+                <th class="px-3 py-2 text-center w-20" data-i18n="col_size">Size</th>
+                <th class="px-3 py-2 text-center w-36" data-i18n="col_modified">Modified</th>
+                <th class="px-3 py-2 text-center w-44" data-i18n="col_actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="files-body" class="divide-y divide-dark-500">
+              <tr><td colspan="4" class="px-3 py-8 text-center text-muted text-xs" data-i18n="no_files">No files uploaded yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Upload Progress Bar -->
+        <div id="upload-progress-container" class="hidden mt-2">
+          <div class="flex justify-between text-xs text-accent mb-1">
+            <span id="upload-status-text">Uploading...</span>
+            <span id="upload-percent">0%</span>
+          </div>
+          <div class="w-full bg-dark-900 rounded-full h-2 border border-dark-500 overflow-hidden">
+            <div id="upload-progress-bar" class="bg-accent h-2 rounded-full transition-all duration-200" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ──── SETTINGS TAB ──── -->
+      <div id="tab-settings" class="tab-content hidden h-full p-6 flex flex-col gap-4 max-w-2xl mx-auto overflow-y-auto">
+        <h2 class="text-xl font-bold text-accent mb-2" data-i18n="settings_title">System Settings</h2>
+        <form id="settings-form" action="javascript:void(0);" onsubmit="event.preventDefault(); return false;" class="space-y-4 bg-dark-800 border border-dark-500 rounded-xl p-6">
+          <!-- Default Volume -->
+          <div>
+            <label class="block text-sm text-muted mb-1" data-i18n="label_default_volume">Default Volume</label>
+            <div class="flex items-center gap-3">
+              <input id="set-vol" type="range" min="0" max="100" value="80" class="flex-1" oninput="document.getElementById('set-vol-label').textContent = this.value + '%'">
+              <span id="set-vol-label" class="text-xs text-muted font-mono w-10 text-right">80%</span>
+            </div>
+          </div>
+
+          <!-- Fade Duration -->
+          <div>
+            <label class="block text-sm text-muted mb-1" data-i18n="label_fade_duration">Fade-out Duration (seconds)</label>
+            <input id="set-fade" type="number" step="0.1" min="0" max="10" value="1.5" class="w-full bg-dark-900 border border-dark-500 rounded-lg px-4 py-2 text-sm text-gray-200 focus:border-accent focus:outline-none">
+          </div>
+
+          <!-- Duck Volume -->
+          <div>
+            <label class="block text-sm text-muted mb-1" data-i18n="label_duck_volume">Ducked Music Volume (%)</label>
+            <input id="set-duck-vol" type="number" min="0" max="100" value="12" class="w-full bg-dark-900 border border-dark-500 rounded-lg px-4 py-2 text-sm text-gray-200 focus:border-accent focus:outline-none">
+          </div>
+
+          <!-- Duck Duration -->
+          <div>
+            <label class="block text-sm text-muted mb-1" data-i18n="label_duck_duration">Ducking Fade Speed (ms)</label>
+            <input id="set-duck-dur" type="number" min="0" max="5000" value="300" class="w-full bg-dark-900 border border-dark-500 rounded-lg px-4 py-2 text-sm text-gray-200 focus:border-accent focus:outline-none">
+          </div>
+
+          <!-- YouTube Download Quality -->
+          <div>
+            <label class="block text-sm text-muted mb-1" data-i18n="label_yt_quality">YouTube Audio Quality</label>
+            <select id="set-yt-quality" class="bg-dark-900 border border-dark-500 rounded-lg px-3 py-2 text-sm w-full focus:border-accent focus:outline-none">
+              <option value="0" data-i18n="yt_quality_high">High (320kbps)</option>
+              <option value="5" data-i18n="yt_quality_medium">Medium (192kbps)</option>
+              <option value="9" data-i18n="yt_quality_low">Low (128kbps)</option>
+            </select>
+          </div>
+
+          <!-- Auto Advance -->
+          <div class="flex items-center gap-2 pt-2">
+            <input id="set-auto" type="checkbox" checked class="w-4 h-4 accent-accent cursor-pointer">
+            <label for="set-auto" class="text-sm text-muted cursor-pointer" data-i18n="label_auto_advance">Auto-play Next Track</label>
+          </div>
+
+          <!-- Warn on Close -->
+          <div class="flex items-center gap-2 pt-2">
+            <input id="set-warn-close" type="checkbox" checked class="w-4 h-4 accent-accent cursor-pointer">
+            <label for="set-warn-close" class="text-sm text-muted cursor-pointer" data-i18n="label_warn_on_close">Warn before closing browser/tab</label>
+          </div>
+
+          <div class="pt-4 flex justify-end">
+            <button type="submit" class="px-6 py-2.5 bg-accent hover:bg-accent-light text-white font-bold text-sm rounded-lg transition" data-i18n="btn_save_settings">Save Settings</button>
+          </div>
+        </form>
+      </div>
+    </main>
+
+    <!-- Status Bar -->
+    <footer class="bg-dark-700 border-t border-dark-500 px-6 py-2 flex items-center text-xs text-muted flex-shrink-0">
+      <span id="status-text" data-i18n="status_ready">Ready</span>
+      <div class="flex-1"></div>
+      <span id="clock" class="font-mono"></span>
+    </footer>
+  </div>
+
+  <!-- ════════════════════════ MODAL ════════════════════════ -->
+  <div id="modal-overlay" class="hidden fixed inset-0 bg-black/60 modal-backdrop z-50 flex items-center justify-center">
+    <div id="modal-content" class="bg-dark-800 border border-dark-500 rounded-2xl p-6 w-full max-w-lg shadow-2xl fade-in max-h-[85vh] overflow-y-auto">
+      <!-- Filled dynamically by scheduler-ui.js -->
+    </div>
+  </div>
+
+  <!-- Custom Exit Warning Modal -->
+  <div id="exit-warning-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 modal-backdrop">
+    <div class="bg-dark-800 border border-red-500/50 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl text-center flex flex-col items-center gap-4 fade-in">
+      <div class="w-14 h-14 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-3xl font-bold">
+        ⚠️
+      </div>
+      <h3 class="text-lg font-bold text-white" data-i18n="modal_exit_title">แจ้งเตือนระบบประชาสัมพันธ์</h3>
+      <p class="text-sm text-gray-300 leading-relaxed" data-i18n="confirm_close_page">
+        โปรแกรมนี้จำเป็นต้องใช้ในห้องประชาสัมพันธ์ และต้องทำงานตลอดเวลา คุณยืนยันที่จะปิดหรือออกจากระบบหรือไม่?
+      </p>
+      <div class="flex justify-center gap-3 w-full mt-2">
+        <button id="btn-cancel-exit" class="flex-1 px-4 py-2.5 bg-dark-600 hover:bg-dark-500 text-white text-sm font-semibold rounded-xl transition border border-dark-500">
+          <span data-i18n="btn_stay_on_page">ย้อนกลับ (ทำงานต่อ)</span>
+        </button>
+        <button id="btn-confirm-exit" class="px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-red-600/30">
+          <span data-i18n="btn_confirm_exit">ยืนยันที่จะออก</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/i18n.js?v=1.1.0"></script>
+  <script src="/js/audio-engine.js?v=1.1.0"></script>
+  <script src="/js/playlist.js?v=1.1.0"></script>
+  <script src="/js/scheduler-ui.js?v=1.1.0"></script>
+  <script src="/js/stream-controller.js?v=1.1.0"></script>
+  <script src="/js/app.js?v=1.1.0"></script>
+</body>
+</html>

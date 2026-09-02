@@ -1,0 +1,18 @@
+{
+  "name": "fallinglight-media-controller",
+  "version": "1.0.0",
+  "description": "Web-based media controller for school PR rooms — Bun + ElysiaJS",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@elysiajs/static": "^1.4.0",
+    "elysia": "^1.4.29"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^6.0.3"
+  }
+}

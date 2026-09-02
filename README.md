@@ -1,91 +1,127 @@
-# FallingLight School PR Media Controller
+# 🎛 FallingLight Media Controller — Web Edition
 
-A standalone, high-performance desktop media controller application built with Python 3 and PySide6. Specially designed for public relations, school announcement rooms, and time-based automation, this software runs efficiently even on older Windows 10 hardware.
+A web-based media controller for school public relations rooms. Runs on your machine via **Bun + ElysiaJS**, accessed from the AV room via browser.
 
----
-
-## Key Features
-
-1. **Modular Architecture**: Separate packages for GUI (PySide6), Media Engine (VLC), and Automation Scheduler (APScheduler).
-2. **Playlist Queue Management**: Add, delete, and reorder files or YouTube URL streams on the fly, with configurable loop counts per track.
-3. **Strict Time Automation**: Build schedules to auto-trigger specific tracks/playlists at strict timestamps or weekly recurring schedules (e.g. morning routine music).
-4. **Mic / PR Ducking**: Smoothly decrease playing volume to a low background level (configurable in settings) instantly for live public address announcements, then smoothly fade back up.
-5. **Smooth Audio Transitions**: Linear volume fades when skipping or stopping tracks to avoid jarring audio cuts.
-6. **Low-CPU Visual VU Meters**: Hardware-like Left/Right LED VU channels with peak holds, running on physical decay equations to prevent CPU spikes.
-7. **Stand-alone Executable Support**: Designed to be compiled into a single EXE using PyInstaller.
+**Stack:** Bun • ElysiaJS • TypeScript • TailwindCSS • HTML5 Audio API
 
 ---
 
-## Technical Stack & Packages
+## ✨ Features
 
-- **Language**: Python 3.10+
-- **GUI Framework**: [PySide6](https://pypi.org/project/PySide6/) (Qt6 Python bindings)
-- **Media Engine**: [python-vlc](https://pypi.org/project/python-vlc/) (requires VLC player libraries installed on the system)
-- **YouTube Integration**: [yt-dlp](https://github.com/yt-dlp/yt-dlp) (extracts streams on background worker threads)
-- **Scheduling Engine**: [APScheduler](https://apscheduler.readthedocs.io/en/stable/) (running weekly cron triggers)
-- **Packager**: [PyInstaller](https://pyinstaller.org/)
-
----
-
-## Installation
-
-### Prerequisite: VLC Media Player
-Since the application uses VLC's native decoding codecs, you must have the **64-bit VLC media player** installed on your system:
-- **Windows**: Download and install VLC from [videolan.org](https://www.videolan.org/). Ensure the installation architecture matches your Python interpreter (usually 64-bit).
-- **Linux/macOS**: Install VLC via your system package manager (e.g., `sudo apt install vlc`).
-*Note: If VLC is not found, the app automatically boots into simulated mode so that GUI layout and scheduling logic can still be fully tested and run.*
-
-### Steps
-1. Clone or download this project directory.
-2. Open your terminal/command prompt and navigate to the project directory:
-   ```bash
-   cd "FallingLight Media controller"
-   ```
-3. Install dependencies from `requirements.txt`:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Start the application:
-   ```bash
-   python main.py
-   ```
+| Feature | Description |
+|---------|-------------|
+| 🔐 **Login** | Cookie-based session auth (`admin` / `cptw@2468`) |
+| 🎵 **Player** | Client-side audio playback with HTML5 Audio API |
+| 📊 **VU Meters** | Real-time stereo levels via Web Audio API `AnalyserNode` |
+| 🎚 **Fade/Duck** | Smooth volume fade-out, mic ducking with manual toggle |
+| 📋 **Playlist** | Add, remove, reorder (drag & drop), per-track loop counts |
+| 📅 **Scheduler** | One-time / Daily / Weekly automated playback |
+| 📤📥 **Import/Export** | Scheduler configs as JSON files |
+| 📁 **File Manager** | Upload, download, delete media files (drag & drop upload) |
+| 🌏 **TH/EN** | Bilingual UI toggle |
 
 ---
 
-## User Guide
+## 🚀 Quick Start
 
-### 1. Main Player Controls
-- Use the playbar buttons to Pause, Resume, Stop, and Skip. Stop and Skip apply a **smooth volume fade-out** over 1-2 seconds.
-- Drag the progress bar at the top and release it to **seek/scrub** through files.
-- Activate the red **Mic / PR Mode** button to duck active playback immediately. Deactivating it restores volume levels smoothly.
+```bash
+# Install dependencies
+bun install
 
-### 2. Playlist Queue
-- Click **Add Audio/Video Files** to load local media (MP3, WAV, MP4, etc.).
-- Click **Add YouTube / URL** to input a YouTube link. The URL is resolved in a background thread without freezing the GUI.
-- Double-click any item in the table to start playing it immediately.
-- Use **Loops** spin box to repeat a track (set to `∞` to repeat forever).
-- Click **▲ Up** and **▼ Down** to reorder items.
+# Start development server (auto-reload)
+bun run dev
 
-### 3. Automation Scheduler
-- Complete the form on the right to schedule tasks.
-- **Weekly Recurring**: Check this to select specific days (e.g., Monday through Friday) at a specific time.
-- **One-time Date**: Uncheck "Weekly Recurring" to specify a calendar date.
-- Enabled schedules run in the background. Schedulers persist inside `schedules.json` in the root folder.
+# Or start production server
+bun run start
+```
+
+Server runs at **http://localhost:3000** and listens on **0.0.0.0** for LAN access.
+
+### Access from AV Room
+1. Find your machine's LAN IP: `ip addr` or `ipconfig`
+2. Open on AV room PC: `http://<your-ip>:3000`
+3. Login: `admin` / `cptw@2468`
 
 ---
 
-## Building a Standalone Executable
+## 📁 Project Structure
 
-To package the project into a single executable file (`.exe` on Windows) for standalone installation:
+```
+├── src/                    # ElysiaJS server (TypeScript)
+│   ├── index.ts            # Entry point (port 3000, 0.0.0.0)
+│   ├── routes/
+│   │   ├── auth.ts         # POST /api/auth/login|logout, GET /check
+│   │   ├── files.ts        # GET/POST/DELETE /api/files
+│   │   └── scheduler.ts    # CRUD + import/export /api/scheduler
+│   ├── middleware/
+│   │   └── auth-guard.ts   # Session cookie validation
+│   └── utils/
+│       └── storage.ts      # File system + schedule persistence
+│
+├── public/                 # Static frontend
+│   ├── index.html          # SPA (login + 3-tab app)
+│   ├── js/
+│   │   ├── audio-engine.js # HTML5 Audio + Web Audio API
+│   │   ├── playlist.js     # Client-side playlist manager
+│   │   ├── scheduler-ui.js # Schedule CRUD + timer
+│   │   ├── i18n.js         # TH/EN language manager
+│   │   └── app.js          # Auth, tabs, file manager
+│   └── i18n/
+│       ├── en.json
+│       └── th.json
+│
+├── uploads/                # Media files (created at runtime)
+├── data/                   # Persistent data
+│   └── schedules.json      # Schedule persistence
+│
+├── package.json
+├── tsconfig.json
+└── README.md
+```
 
-1. Install PyInstaller (included in `requirements.txt`):
-   ```bash
-   pip install pyinstaller
-   ```
-2. Run the packaging command from the root folder:
-   ```bash
-   pyinstaller --noconsole --onefile --name="FallingLightMediaWorkstation" main.py
-   ```
-   - `--noconsole` hides the cmd window.
-   - `--onefile` outputs a single `.exe` file.
-   - The compiled executable will be located inside the `dist/` directory.
+---
+
+## 🎮 Usage
+
+### Player Tab
+- **Add File** — pick from uploaded files
+- **Double-click** a track to play it
+- **Drag & drop** rows to reorder
+- **Loop count** — set per track (0 = infinite)
+- **🎙 MIC/PR** — press to duck audio, press again to restore
+
+### Schedule Tab
+- Create **daily/weekly/one-time** schedules
+- Schedules fire automatically when the browser is open
+- **Export** schedules as JSON backup
+- **Import** to restore or share schedules
+
+### Files Tab
+- **Upload** via button or drag & drop
+- **Download** any uploaded file
+- **Delete** files you no longer need
+- **🎵** button adds file to playlist
+
+---
+
+## 📋 API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/login` | Login with username/password |
+| POST | `/api/auth/logout` | Clear session |
+| GET | `/api/auth/check` | Check session validity |
+| GET | `/api/files` | List uploaded files |
+| POST | `/api/files/upload` | Upload file (multipart) |
+| DELETE | `/api/files/:filename` | Delete a file |
+| GET | `/api/scheduler` | List schedules |
+| POST | `/api/scheduler` | Create schedule |
+| PUT | `/api/scheduler/:id` | Update schedule |
+| DELETE | `/api/scheduler/:id` | Delete schedule |
+| PATCH | `/api/scheduler/:id/toggle` | Toggle enabled |
+| GET | `/api/scheduler/export` | Export as JSON download |
+| POST | `/api/scheduler/import` | Import from JSON file |
+
+---
+
+*Built with ❤ for school PR rooms — FallingLight v1.0.0 Web Edition*

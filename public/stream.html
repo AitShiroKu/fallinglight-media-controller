@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FallingLight — Streaming Receiver</title>
+  <meta name="description" content="Streaming receiver for FallingLight Media Controller">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: { 900: '#0d1117', 800: '#161b22', 700: '#1c2333', 600: '#21283b', 500: '#2a3352' },
+            accent: { DEFAULT: '#e94560', light: '#ff6b81', dark: '#b8354d', glow: 'rgba(233,69,96,0.3)' },
+            muted: '#8b949e',
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans Thai', 'Segoe UI', 'Tahoma', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Cascadia Code', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; cursor: none; }
+    ::-webkit-scrollbar { display: none; }
+
+    .vu-bar { transition: height 0.08s ease-out; }
+
+    /* Connection pulse animations */
+    .pulse-waiting {
+      animation: pulseWait 2s ease-in-out infinite;
+    }
+    @keyframes pulseWait {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+
+    .pulse-connected {
+      animation: pulseConn 1.5s ease-in-out infinite;
+    }
+    @keyframes pulseConn {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.5); }
+      50% { box-shadow: 0 0 0 16px rgba(63,185,80,0); }
+    }
+
+    .glow-accent {
+      box-shadow: 0 0 40px rgba(233,69,96,0.15), 0 0 80px rgba(233,69,96,0.05);
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Scrolling track title */
+    .track-scroll {
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .track-scroll-inner {
+      display: inline-block;
+      animation: scrollText 12s linear infinite;
+    }
+    @keyframes scrollText {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+  </style>
+</head>
+<body class="bg-dark-900 text-gray-200 min-h-screen flex items-center justify-center select-none pt-10">
+
+  <!-- Red Warning Banner -->
+  <div id="pr-warning-banner" class="fixed top-0 left-0 right-0 z-40 bg-red-600/90 text-white px-6 py-2 text-xs font-bold flex items-center justify-center shadow-md border-b border-red-500 text-center">
+    <span class="mr-2 text-sm animate-pulse">⚠️</span>
+    <span>ระบบนี้จำเป็นต้องใช้ในห้องประชาสัมพันธ์ และต้องทำงานตลอดเวลา (ห้ามปิดหน้าจอนี้)</span>
+  </div>
+
+  <!-- Autoplay / Gesture Unlock Overlay -->
+  <div id="unlock-overlay" class="fixed inset-0 z-50 bg-dark-900/95 backdrop-blur-md flex flex-col items-center justify-center p-6 transition-all duration-500">
+    <div class="bg-dark-800 border border-accent/30 rounded-2xl p-8 max-w-md w-full text-center glow-accent shadow-2xl">
+      <div class="text-7xl mb-6 animate-pulse">🔊</div>
+      <h2 class="text-2xl font-bold text-accent mb-3">เปิดใช้งานระบบเสียง</h2>
+      <p class="text-gray-300 text-sm mb-6 leading-relaxed">
+        เนื่องจากข้อกำหนดความปลอดภัยของเว็บบราวเซอร์ (Autoplay Policy) กรุณาคลิกปุ่มด้านล่างเพื่ออนุญาตให้สตรีมเสียงมายังเครื่องนี้
+      </p>
+      <button id="btn-unlock-audio" class="w-full py-4 bg-accent hover:bg-accent-light text-white font-bold text-lg rounded-xl transition duration-300 transform hover:scale-[1.02] shadow-lg shadow-accent/20">
+        เปิดใช้งานเสียง (Start Audio)
+      </button>
+    </div>
+  </div>
+
+  <!-- ════════════════ MAIN CONTAINER ════════════════ -->
+  <div id="stream-container" class="w-full max-w-3xl mx-auto p-8 fade-in">
+
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="text-6xl mb-4">🔊</div>
+      <h1 class="text-3xl font-bold text-accent tracking-tight">FallingLight</h1>
+      <p class="text-muted text-sm mt-1">Streaming Receiver — ตัวรับสตรีมมิ่ง</p>
+    </div>
+
+    <!-- Connection Status -->
+    <div id="status-card" class="bg-dark-800 border border-dark-500 rounded-2xl p-8 mb-6 text-center glow-accent transition-all duration-500">
+      <div id="status-icon" class="text-5xl mb-4 pulse-waiting">📡</div>
+      <div id="status-label" class="text-xl font-bold text-yellow-400">กำลังรอการเชื่อมต่อจากรีโมท...</div>
+      <div id="status-sub" class="text-sm text-muted mt-2">เปิดหน้านี้ทิ้งไว้บนคอมพิวเตอร์ห้องโสตฯ</div>
+    </div>
+
+    <!-- Now Playing (hidden until connected) -->
+    <div id="now-playing" class="hidden bg-dark-800 border border-dark-500 rounded-2xl p-6 mb-6 transition-all duration-300">
+      <!-- Track Info -->
+      <div class="flex items-center gap-4 mb-5">
+        <div class="text-4xl">🎵</div>
+        <div class="flex-1 min-w-0">
+          <div id="stream-track-title" class="text-2xl font-bold truncate">—</div>
+          <div id="stream-track-file" class="text-sm text-muted mt-0.5 truncate">ไม่มีเพลงที่เล่น</div>
+        </div>
+        <div id="stream-loop-badge" class="hidden px-3 py-1 bg-accent/20 text-accent rounded-full text-sm font-bold">
+          🔁 <span id="stream-loop-text">1/1</span>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="mb-4">
+        <div class="w-full bg-dark-900 rounded-full h-3 border border-dark-500 overflow-hidden">
+          <div id="stream-progress" class="bg-gradient-to-r from-accent to-accent-light h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <div class="flex justify-between text-xs text-muted font-mono mt-2">
+          <span id="stream-time-current">0:00</span>
+          <span id="stream-time-total">0:00</span>
+        </div>
+      </div>
+
+      <!-- VU Meters -->
+      <div class="flex items-end justify-center gap-6 h-28 mb-4">
+        <div class="flex flex-col items-center gap-1">
+          <div class="w-10 h-24 bg-dark-900 rounded-lg border border-dark-500 overflow-hidden flex flex-col-reverse">
+            <div id="stream-vu-left" class="vu-bar w-full rounded-lg" style="height:0%;background:linear-gradient(to top,#3fb950 60%,#d29922 80%,#e94560 100%)"></div>
+          </div>
+          <span class="text-xs text-muted">L</span>
+        </div>
+        <div class="flex flex-col items-center gap-1">
+          <div id="stream-vu-db" class="text-2xl font-mono text-muted font-bold">-∞ dB</div>
+          <div id="stream-playing-state" class="text-sm text-accent font-bold mt-1">⏸ Paused</div>
+        </div>
+        <div class="flex flex-col items-center gap-1">
+          <div class="w-10 h-24 bg-dark-900 rounded-lg border border-dark-500 overflow-hidden flex flex-col-reverse">
+            <div id="stream-vu-right" class="vu-bar w-full rounded-lg" style="height:0%;background:linear-gradient(to top,#3fb950 60%,#d29922 80%,#e94560 100%)"></div>
+          </div>
+          <span class="text-xs text-muted">R</span>
+        </div>
+      </div>
+
+      <!-- Volume Display -->
+      <div class="flex items-center justify-center gap-3">
+        <span class="text-2xl" id="stream-vol-icon">🔊</span>
+        <div class="w-48 bg-dark-900 rounded-full h-2 border border-dark-500 overflow-hidden">
+          <div id="stream-vol-bar" class="bg-accent h-2 rounded-full transition-all duration-200" style="width: 80%"></div>
+        </div>
+        <span id="stream-vol-label" class="text-sm font-mono text-muted w-12 text-right">80%</span>
+      </div>
+    </div>
+
+    <!-- Ducking Indicator -->
+    <div id="duck-indicator" class="hidden bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 mb-6 text-center">
+      <div class="text-3xl mb-1">🎙</div>
+      <div class="text-yellow-400 font-bold">ไมค์เปิด — เสียงถูกหรี่ลง</div>
+    </div>
+
+    <!-- Connection Info Footer -->
+    <div class="text-center text-xs text-muted">
+      <span id="connection-info">WebSocket: ไม่ได้เชื่อมต่อ</span>
+      <span class="mx-2">·</span>
+      <span id="stream-clock"></span>
+    </div>
+  </div>
+
+  <script src="/js/stream-receiver.js?v=1.0.4"></script>
+</body>
+</html>
