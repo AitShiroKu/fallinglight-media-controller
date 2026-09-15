@@ -483,3 +483,333 @@ describe("Controller Video Preview Deck & Media Player UI", () => {
     expect(streamHtml).toContain("max-height: 100vh !important");
   });
 });
+
+describe("Playlist Auto-Advance & Per-Track autoNext Control", () => {
+  it("verifies per-track autoNext logic stops playback when autoNext is false in both local and remote modes", async () => {
+    const playlistCode = await Bun.file("public/js/playlist.js").text();
+
+    // Create a sandbox to run playlist.js
+    let playedUrl: string | null = null;
+    let stopped = false;
+    let remotePlaySent: string | null = null;
+    let remoteStopSent = false;
+    let isPaused = false;
+    let isPlaying = false;
+    let statusSet: string | null = null;
+
+    const mockWindow: any = {
+      playlist: null,
+      audioEngine: {
+        remoteMode: false,
+        get isPlaying() { return isPlaying; },
+        get isPaused() { return isPaused; },
+        play: (url: string) => {
+          playedUrl = url;
+          isPlaying = true;
+          isPaused = false;
+        },
+        stop: () => {
+          stopped = true;
+          isPlaying = false;
+          isPaused = true;
+        },
+        stopWithFade: () => {
+          stopped = true;
+          isPlaying = false;
+        },
+        audioEl: { src: "" },
+      },
+      streamController: {
+        sendPlay: (fn: string) => {
+          remotePlaySent = fn;
+          isPlaying = true;
+        },
+        sendStop: () => {
+          remoteStopSent = true;
+          isPlaying = false;
+        },
+      },
+      appI18n: {
+        tr: (k: string) => k,
+      },
+      document: {
+        getElementById: (id: string) => ({
+          textContent: "",
+          innerHTML: "",
+          classList: { remove: () => {}, add: () => {} },
+          querySelectorAll: () => [],
+        }),
+        querySelectorAll: () => [],
+        createElement: (tag: string) => {
+          let content = "";
+          return {
+            get textContent() { return content; },
+            set textContent(v: string) { content = v; },
+            get innerHTML() { return content; },
+            set innerHTML(v: string) { content = v; },
+          };
+        },
+      },
+    };
+
+    // Execute playlist.js inside isolated function with mockWindow
+    const fn = new Function("window", "document", playlistCode);
+    fn(mockWindow, mockWindow.document);
+
+    const pl = mockWindow.playlist;
+    expect(pl).toBeTruthy();
+
+    // Add 3 tracks:
+    // Track 0: autoNext = true ("เล่นต่อ")
+    // Track 1: autoNext = false ("หยุดเมื่อจบ")
+    // Track 2: autoNext = true ("เล่นต่อ")
+    pl.addTrack("track0.mp3", 1, true);
+    pl.addTrack("track1.mp3", 1, false);
+    pl.addTrack("track2.mp3", 1, true);
+
+    expect(pl.items.length).toBe(3);
+    expect(pl.items[0].autoNext).toBe(true);
+    expect(pl.items[1].autoNext).toBe(false);
+    expect(pl.items[2].autoNext).toBe(true);
+
+    // Test toggleAutoNext
+    pl.toggleAutoNext(0);
+    expect(pl.items[0].autoNext).toBe(false);
+    pl.toggleAutoNext(0);
+    expect(pl.items[0].autoNext).toBe(true);
+
+    // --- TEST 1: Track 0 (autoNext: true) naturally ends in LOCAL mode ---
+    pl.playIndex(0);
+    expect(playedUrl).toBe("/uploads/track0.mp3");
+    stopped = false;
+    pl.onTrackEnded(); // Track 0 naturally ends
+    // Should advance to Track 1 and play it
+    expect(pl.currentIndex).toBe(1);
+    expect(playedUrl).toBe("/uploads/track1.mp3");
+    expect(stopped).toBe(false);
+
+    // --- TEST 2: Track 1 (autoNext: false) naturally ends in LOCAL mode ---
+    // Track 1 is currently playing, and its autoNext is false
+    stopped = false;
+    playedUrl = null;
+    pl.onTrackEnded(); // Track 1 naturally ends
+    // Must STOP! Must NOT play Track 2
+    expect(stopped).toBe(true);
+    expect(playedUrl).toBeNull();
+    // Index should cue Track 2
+    expect(pl.currentIndex).toBe(2);
+
+    // --- TEST 3: Track 1 naturally ends in REMOTE mode ---
+    mockWindow.audioEngine.remoteMode = true;
+    pl.playIndex(1); // Play track 1 in remote mode
+    expect(remotePlaySent).toBe("track1.mp3");
+    stopped = false;
+    remotePlaySent = null;
+
+    pl.onTrackEnded(); // Track 1 ends on receiver
+    // In remote mode, must ALSO STOP! Must NOT play track 2!
+    expect(stopped).toBe(true);
+    expect(remotePlaySent).toBeNull();
+    expect(pl.currentIndex).toBe(2);
+
+    // --- TEST 4: Track 2 (autoNext: true) naturally ends in REMOTE mode ---
+    pl.playIndex(0); // Set to track 0 (autoNext: true)
+    remotePlaySent = null;
+    stopped = false;
+    pl.onTrackEnded(); // Track 0 ends in remote mode
+    // Should advance and play Track 1 in remote mode
+    expect(remotePlaySent).toBe("track1.mp3");
+    expect(pl.currentIndex).toBe(1);
+  });
+});
+
+describe("Folder Drag-and-Drop & Direct Folder Upload/Download", () => {
+  let app: Elysia;
+  let sessionCookie = "";
+
+  beforeAll(async () => {
+    await initStorage();
+    app = new Elysia()
+      .use(authRoutes)
+      .use(fileRoutes)
+      .use(youtubeRoutes);
+
+    const res = await app.handle(new Request("http://localhost/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "admin", password: "cptw@2468" }),
+    }));
+    const cookieHeader = res.headers.get("set-cookie") || "";
+    const match = cookieHeader.match(/session=([^;]+)/);
+    if (match) {
+      sessionCookie = `session=${match[1]}`;
+    }
+  });
+
+  it("verifies YouTube download route accepts folder destination parameter and creates job with folder", async () => {
+    const res = await app.handle(new Request("http://localhost/api/youtube/download", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: sessionCookie,
+      },
+      body: JSON.stringify({
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        format: "mp3",
+        folder: "Anthems",
+      }),
+    }));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(typeof data.jobId).toBe("string");
+
+    // Check progress endpoint
+    const progRes = await app.handle(new Request(`http://localhost/api/youtube/progress/${data.jobId}`, {
+      headers: { Cookie: sessionCookie },
+    }));
+    expect(progRes.status).toBe(200);
+    const progData = await progRes.json();
+    expect(progData.status).toBe("downloading");
+    expect(progData.format).toBe("mp3");
+  });
+
+  it("verifies direct folder upload via /api/files/upload with folder parameter", async () => {
+    const boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+    const bodyParts = [
+      `--${boundary}\r\nContent-Disposition: form-data; name="folder"\r\n\r\nSchoolPR\r\n`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="morning_bell.wav"\r\nContent-Type: audio/wav\r\n\r\nRIFFfake_wav_data\r\n`,
+      `--${boundary}--\r\n`,
+    ];
+    const multipartBody = bodyParts.join("");
+
+    const res = await app.handle(new Request("http://localhost/api/files/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        Cookie: sessionCookie,
+      },
+      body: multipartBody,
+    }));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(Array.isArray(data.files)).toBe(true);
+    expect(data.files[0]).toContain("SchoolPR/morning_bell.wav");
+
+    // Verify file is in SchoolPR folder listing
+    const listRes = await app.handle(new Request("http://localhost/api/files?folder=SchoolPR", {
+      headers: { Cookie: sessionCookie },
+    }));
+    expect(listRes.status).toBe(200);
+    const listData = await listRes.json();
+    const bellFile = listData.files.find((f: any) => f.name === "morning_bell.wav");
+    expect(bellFile).toBeDefined();
+    expect(bellFile.folder).toBe("SchoolPR");
+  });
+
+  it("verifies moving/dragging files between root and folders and back to root", async () => {
+    // 1. Create a root file to test dragging into folder
+    const boundary = "----WebKitFormBoundaryMoveTest";
+    const bodyParts = [
+      `--${boundary}\r\nContent-Disposition: form-data; name="folder"\r\n\r\n\r\n`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="drag_test.mp3"\r\nContent-Type: audio/mpeg\r\n\r\nfake_mp3_data\r\n`,
+      `--${boundary}--\r\n`,
+    ];
+    const uploadRes = await app.handle(new Request("http://localhost/api/files/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        Cookie: sessionCookie,
+      },
+      body: bodyParts.join(""),
+    }));
+    expect(uploadRes.status).toBe(200);
+
+    // 2. Drag/Move from root into "SchoolPR" folder
+    const moveRes = await app.handle(new Request("http://localhost/api/files/move", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: sessionCookie,
+      },
+      body: JSON.stringify({
+        filename: "drag_test.mp3",
+        targetFolder: "SchoolPR",
+      }),
+    }));
+    expect(moveRes.status).toBe(200);
+    const moveData = await moveRes.json();
+    expect(moveData.success).toBe(true);
+    expect(moveData.newPath).toBe("SchoolPR/drag_test.mp3");
+
+    // 3. Drag/Move back to Root ("")
+    const moveBackRes = await app.handle(new Request("http://localhost/api/files/move", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: sessionCookie,
+      },
+      body: JSON.stringify({
+        filename: "SchoolPR/drag_test.mp3",
+        targetFolder: "",
+      }),
+    }));
+    expect(moveBackRes.status).toBe(200);
+    const moveBackData = await moveBackRes.json();
+    expect(moveBackData.success).toBe(true);
+    expect(moveBackData.newPath).toBe("drag_test.mp3");
+
+    // Clean up
+    await app.handle(new Request("http://localhost/api/files/drag_test.mp3", {
+      method: "DELETE",
+      headers: { Cookie: sessionCookie },
+    }));
+    await app.handle(new Request("http://localhost/api/files/SchoolPR/morning_bell.wav", {
+      method: "DELETE",
+      headers: { Cookie: sessionCookie },
+    }));
+    await app.handle(new Request("http://localhost/api/files/folder/SchoolPR", {
+      method: "DELETE",
+      headers: { Cookie: sessionCookie },
+    }));
+  });
+
+  it("verifies UI templates, icons, and i18n dictionaries for folder drag-and-drop and destination selector", async () => {
+    const indexHtml = await Bun.file("public/index.html").text();
+    const iconsJs = await Bun.file("public/js/icons.js").text();
+    const appJs = await Bun.file("public/js/app.js").text();
+    const en = await Bun.file("public/i18n/en.json").json();
+    const th = await Bun.file("public/i18n/th.json").json();
+
+    // 1. YouTube folder destination selector
+    expect(indexHtml).toContain('id="yt-destination-folder"');
+    expect(indexHtml).toContain('data-i18n="yt_destination_folder"');
+    expect(appJs).toContain("setTargetFolder");
+    expect(appJs).toContain("updateYoutubeFolderSelector");
+
+    // 2. Drop zone target badge & text
+    expect(indexHtml).toContain('id="drop-zone-target-badge"');
+    expect(indexHtml).toContain('id="drop-zone-folder-name"');
+    expect(appJs).toContain("updateDropZoneText");
+
+    // 3. Drag and drop file row and folder card handlers
+    expect(appJs).toContain("onFileDragStart");
+    expect(appJs).toContain("onFileDragEnd");
+    expect(appJs).toContain("onFolderDragOver");
+    expect(appJs).toContain("onFolderDragLeave");
+    expect(appJs).toContain("onFolderDrop");
+    expect(appJs).toContain("folder-drop-target");
+
+    // 4. Grip icon definition
+    expect(iconsJs).toContain("'grip':");
+
+    // 5. i18n translations
+    expect(en.yt_destination_folder).toBeDefined();
+    expect(th.yt_destination_folder).toBeDefined();
+    expect(en.drop_zone_target).toBeDefined();
+    expect(th.drop_zone_target).toBeDefined();
+    expect(en.drop_on_folder_hint).toBeDefined();
+    expect(th.drop_on_folder_hint).toBeDefined();
+  });
+});
+

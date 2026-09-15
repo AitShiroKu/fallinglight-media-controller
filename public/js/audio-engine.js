@@ -223,6 +223,7 @@
       videoEl.src = '';
     }
     stopVU();
+    updatePlayButton(false);
   }
 
   function stopWithFade(durationMs) {

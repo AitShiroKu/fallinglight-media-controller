@@ -87,8 +87,16 @@
     _searchQuery: '',
     _movingFilePath: null,
 
+    _draggedFilePath: null,
+    _toastTimer: null,
+
     load: function (folder) {
-      if (folder !== undefined) fileManager._currentFolder = folder || '';
+      if (folder !== undefined) {
+        fileManager._currentFolder = folder || '';
+        if (window.youtubeDownloader) {
+          window.youtubeDownloader.targetFolder = fileManager._currentFolder;
+        }
+      }
       var url = '/api/files?folder=' + encodeURIComponent(fileManager._currentFolder);
       fetch(url)
         .then(function (r) { return r.json(); })
@@ -98,12 +106,17 @@
           fileManager.renderBreadcrumbs();
           fileManager.renderFolders();
           fileManager.render();
+          fileManager.updateDropZoneText();
+          fileManager.updateYoutubeFolderSelector();
         })
         .catch(function () { });
     },
 
     navigateTo: function (folder) {
       fileManager._currentFolder = folder || '';
+      if (window.youtubeDownloader) {
+        window.youtubeDownloader.targetFolder = fileManager._currentFolder;
+      }
       fileManager.load(fileManager._currentFolder);
     },
 
@@ -113,11 +126,144 @@
       fileManager.renderFolders();
     },
 
+    onFileDragStart: function (e, filePath, rowEl) {
+      fileManager._draggedFilePath = filePath;
+      if (e.dataTransfer) {
+        e.dataTransfer.setData('text/plain', filePath);
+        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'media_file', path: filePath }));
+        e.dataTransfer.effectAllowed = 'move';
+      }
+      if (rowEl) {
+        rowEl.classList.add('opacity-40', 'bg-accent/10');
+      }
+    },
+
+    onFileDragEnd: function (e, rowEl) {
+      fileManager._draggedFilePath = null;
+      if (rowEl) {
+        rowEl.classList.remove('opacity-40', 'bg-accent/10');
+      }
+      document.querySelectorAll('.folder-drop-target').forEach(function (el) {
+        el.classList.remove('border-accent', 'bg-accent/25', 'ring-2', 'ring-accent/40');
+      });
+    },
+
+    onFolderDragOver: function (e, el) {
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'move';
+      }
+      el.classList.add('border-accent', 'bg-accent/25', 'ring-2', 'ring-accent/40');
+    },
+
+    onFolderDragLeave: function (e, el) {
+      el.classList.remove('border-accent', 'bg-accent/25', 'ring-2', 'ring-accent/40');
+    },
+
+    onFolderDrop: function (e, targetFolder, el) {
+      e.preventDefault();
+      if (el) {
+        el.classList.remove('border-accent', 'bg-accent/25', 'ring-2', 'ring-accent/40');
+      }
+
+      // 1. External files dropped from OS
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        fileManager.upload(e.dataTransfer.files, targetFolder);
+        return;
+      }
+
+      // 2. Internal dragged media file from table
+      var filePath = (e.dataTransfer ? e.dataTransfer.getData('text/plain') : '') || fileManager._draggedFilePath;
+      if (!filePath) return;
+
+      var currentFileFolder = filePath.lastIndexOf('/') !== -1 ? filePath.substring(0, filePath.lastIndexOf('/')) : '';
+      if (currentFileFolder === (targetFolder || '')) {
+        return; // Already inside target folder
+      }
+
+      fetch('/api/files/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: filePath, targetFolder: targetFolder || '' }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.success) {
+            var fileName = filePath.split('/').pop();
+            var targetName = targetFolder ? targetFolder : (tr('folder_root') || 'Root');
+            fileManager.showToast((tr('move_success') || 'Moved file!') + ' (' + fileName + ' → ' + targetName + ')');
+            fileManager.load();
+          } else {
+            alert(data.error || 'Failed to move file');
+          }
+        })
+        .catch(function () { alert('Error moving file'); });
+    },
+
+    showToast: function (msg) {
+      var toast = document.getElementById('app-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'app-toast';
+        toast.className = 'fixed bottom-6 right-6 z-50 bg-dark-800 border border-accent/60 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl transition-all duration-300 pointer-events-none opacity-0 translate-y-2 flex items-center gap-2';
+        document.body.appendChild(toast);
+      }
+      var checkIcon = window.Icons ? window.Icons.get('check', { size: 14, className: 'text-green-400' }) : '✓';
+      toast.innerHTML = checkIcon + '<span>' + escHtml(msg) + '</span>';
+      toast.classList.remove('opacity-0', 'translate-y-2');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(fileManager._toastTimer);
+      fileManager._toastTimer = setTimeout(function () {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-2');
+      }, 3000);
+    },
+
+    updateDropZoneText: function () {
+      var badge = document.getElementById('drop-zone-target-badge');
+      var nameEl = document.getElementById('drop-zone-folder-name');
+      var mainText = document.getElementById('drop-zone-main-text');
+      var cur = fileManager._currentFolder;
+
+      if (cur) {
+        if (badge) {
+          badge.classList.remove('hidden');
+          if (nameEl) nameEl.textContent = cur;
+        }
+        if (mainText) {
+          mainText.textContent = (tr('drop_zone_target') || 'Uploading to:') + ' ' + cur;
+        }
+      } else {
+        if (badge) badge.classList.add('hidden');
+        if (mainText) {
+          mainText.textContent = tr('drop_zone_text') || 'Drag & drop files here or click Upload above';
+        }
+      }
+    },
+
+    updateYoutubeFolderSelector: function () {
+      var select = document.getElementById('yt-destination-folder');
+      if (!select) return;
+
+      var currentVal = window.youtubeDownloader && window.youtubeDownloader.targetFolder !== undefined
+        ? window.youtubeDownloader.targetFolder
+        : fileManager._currentFolder;
+
+      var options = '<option value="">(Root) ' + tr('folder_root') + '</option>';
+      (fileManager._allFolders || []).forEach(function (f) {
+        var isSelected = (f.path === currentVal) ? ' selected' : '';
+        options += '<option value="' + escAttr(f.path) + '"' + isSelected + '>' + escHtml(f.path) + '</option>';
+      });
+      select.innerHTML = options;
+      select.value = currentVal || '';
+    },
+
     renderBreadcrumbs: function () {
       var container = document.getElementById('folder-breadcrumb');
       if (!container) return;
       var cur = fileManager._currentFolder;
-      var html = '<span class="cursor-pointer hover:text-white ' + (!cur ? 'text-accent font-bold' : 'text-gray-300') + '" onclick="window.fileManager.navigateTo(\'\')">' + tr('folder_root') + '</span>';
+      var rootDropHint = tr('drop_on_root_hint') || 'Drop here to move back to Root';
+      var html = '<span class="folder-drop-target cursor-pointer hover:text-white px-1.5 py-0.5 rounded transition ' + (!cur ? 'text-accent font-bold' : 'text-gray-300') + '" onclick="window.fileManager.navigateTo(\'\')" ondragover="window.fileManager.onFolderDragOver(event, this)" ondragleave="window.fileManager.onFolderDragLeave(event, this)" ondrop="window.fileManager.onFolderDrop(event, \'\', this)" title="' + escAttr(rootDropHint) + '">' + tr('folder_root') + '</span>';
       
       if (cur) {
         var parts = cur.split('/');
@@ -127,9 +273,10 @@
           var isLast = (i === parts.length - 1);
           html += '<span class="text-dark-500 mx-1">/</span>';
           if (isLast) {
-            html += '<span class="text-accent font-bold">' + escHtml(parts[i]) + '</span>';
+            html += '<span class="text-accent font-bold px-1.5 py-0.5">' + escHtml(parts[i]) + '</span>';
           } else {
-            html += '<span class="cursor-pointer hover:text-white text-gray-300" onclick="window.fileManager.navigateTo(\'' + escAttr(accumulated) + '\')">' + escHtml(parts[i]) + '</span>';
+            var crumbHint = (tr('drop_on_folder_hint') || 'Drop file here to move into this folder').replace('{folder}', parts[i]);
+            html += '<span class="folder-drop-target cursor-pointer hover:text-white text-gray-300 px-1.5 py-0.5 rounded transition" onclick="window.fileManager.navigateTo(\'' + escAttr(accumulated) + '\')" ondragover="window.fileManager.onFolderDragOver(event, this)" ondragleave="window.fileManager.onFolderDragLeave(event, this)" ondrop="window.fileManager.onFolderDrop(event, \'' + escAttr(accumulated) + '\', this)" title="' + escAttr(crumbHint) + '">' + escHtml(parts[i]) + '</span>';
           }
         }
       }
@@ -173,7 +320,8 @@
         var folderIcon = window.Icons ? window.Icons.get('folder', { size: 16, className: 'text-yellow-400' }) : '';
         var playIcon = window.Icons ? window.Icons.get('play', { size: 12, className: 'text-green-400' }) : '';
         var trashIcon = window.Icons ? window.Icons.get('trash', { size: 12, className: 'text-accent' }) : '';
-        html += '<div class="flex items-center gap-2 bg-dark-900/80 hover:bg-dark-700/80 border border-dark-500 rounded-xl px-3 py-2 transition text-xs group cursor-pointer" onclick="window.fileManager.navigateTo(\'' + escAttr(f.path) + '\')">';
+        var dropHint = (tr('drop_on_folder_hint') || 'Drop file here to move into this folder').replace('{folder}', f.name);
+        html += '<div class="folder-drop-target flex items-center gap-2 bg-dark-900/80 hover:bg-dark-700/80 border border-dark-500 rounded-xl px-3 py-2 transition text-xs group cursor-pointer" onclick="window.fileManager.navigateTo(\'' + escAttr(f.path) + '\')" ondragover="window.fileManager.onFolderDragOver(event, this)" ondragleave="window.fileManager.onFolderDragLeave(event, this)" ondrop="window.fileManager.onFolderDrop(event, \'' + escAttr(f.path) + '\', this)" title="' + escAttr(dropHint) + '">';
         html += '<span class="shrink-0 flex items-center">' + folderIcon + '</span>';
         html += '<span class="font-medium text-gray-200 group-hover:text-accent transition">' + escHtml(f.name) + '</span>';
         html += '<span class="text-[10px] bg-dark-700 text-muted px-2 py-0.5 rounded-full font-mono">' + f.fileCount + '</span>';
@@ -209,14 +357,16 @@
         var filePath = f.path || f.name;
         var encodedUrl = '/uploads/' + (filePath.split('/').map(encodeURIComponent).join('/'));
         var isVideo = f.isVideo;
+        var gripIcon = window.Icons ? window.Icons.get('grip', { size: 14, className: 'text-dark-500 group-hover/row:text-accent cursor-grab' }) : '';
         var typeIcon = window.Icons ? window.Icons.get(isVideo ? 'video' : 'music', { size: 16, className: isVideo ? 'text-indigo-400' : 'text-accent' }) : '';
         var addIcon = window.Icons ? window.Icons.get('plus', { size: 14, className: 'text-green-400' }) : '+';
         var moveIcon = window.Icons ? window.Icons.get('move', { size: 14, className: 'text-cyan-400' }) : '';
         var downloadIcon = window.Icons ? window.Icons.get('download', { size: 14 }) : '';
         var trashIcon = window.Icons ? window.Icons.get('trash', { size: 14, className: 'text-accent' }) : '';
 
-        html += '<tr class="hover:bg-dark-600/30 transition border-b border-dark-600/20">';
+        html += '<tr draggable="true" ondragstart="window.fileManager.onFileDragStart(event, \'' + escAttr(filePath) + '\', this)" ondragend="window.fileManager.onFileDragEnd(event, this)" class="hover:bg-dark-600/30 transition border-b border-dark-600/20 cursor-grab active:cursor-grabbing group/row">';
         html += '<td class="px-3 py-2.5"><div class="flex items-center gap-2">';
+        html += '<span class="shrink-0 flex items-center select-none" title="' + (tr('drag_to_folder_hint') || 'Drag onto a folder to move') + '">' + gripIcon + '</span>';
         html += '<span class="shrink-0 flex items-center">' + typeIcon + '</span>';
         html += '<span class="text-sm font-medium text-gray-200">' + escHtml(f.name) + '</span>';
         html += '</div></td>';
@@ -236,15 +386,17 @@
       tbody.innerHTML = html;
     },
 
-    upload: function (fileList) {
+    upload: function (fileList, targetFolderOverride) {
       if (!fileList || fileList.length === 0) return;
+      var targetFolder = (targetFolderOverride !== undefined) ? targetFolderOverride : (fileManager._currentFolder || '');
       var containerEl = document.getElementById('upload-progress-container');
       var textEl = document.getElementById('upload-status-text');
       var percentEl = document.getElementById('upload-percent');
       var barEl = document.getElementById('upload-progress-bar');
       
+      var targetDisplayName = targetFolder ? targetFolder : (tr('folder_root') || 'Root');
       if(containerEl) containerEl.classList.remove('hidden');
-      if(textEl) textEl.textContent = 'Uploading ' + fileList.length + ' file(s)...';
+      if(textEl) textEl.textContent = 'Uploading ' + fileList.length + ' file(s) to ' + targetDisplayName + '...';
       if(percentEl) percentEl.textContent = '0%';
       if(barEl) {
         barEl.style.width = '0%';
@@ -252,7 +404,7 @@
       }
 
       var formData = new FormData();
-      formData.append('folder', fileManager._currentFolder || '');
+      formData.append('folder', targetFolder);
       for (var i = 0; i < fileList.length; i++) {
         formData.append('file', fileList[i]);
       }
@@ -275,7 +427,7 @@
             if (data.success) {
               if (textEl) {
                 var checkSvg = window.Icons ? window.Icons.get('check', { size: 14, className: 'text-green-400 inline mr-1' }) : '';
-                textEl.innerHTML = checkSvg + '<span>Upload complete!</span>';
+                textEl.innerHTML = checkSvg + '<span>Upload complete! (' + targetDisplayName + ')</span>';
               }
               if (percentEl) percentEl.textContent = '100%';
             } else {
@@ -291,7 +443,7 @@
               textEl.innerHTML = checkSvg + '<span>Upload complete!</span>';
             }
           }
-          fileManager.load();
+          fileManager.load(fileManager._currentFolder);
         } else {
           if (textEl) {
             var warnSvg = window.Icons ? window.Icons.get('warning', { size: 14, className: 'text-red-400 inline mr-1' }) : '';
@@ -581,6 +733,13 @@
   // ── YouTube Downloader ────────────────────────────────
   var youtubeDownloader = {
     currentFormat: 'mp3',
+    targetFolder: undefined,
+
+    setTargetFolder: function (folder) {
+      this.targetFolder = folder || '';
+      var sel = document.getElementById('yt-destination-folder');
+      if (sel) sel.value = this.targetFolder;
+    },
 
     setFormat: function (fmt) {
       this.currentFormat = fmt === 'mp4' ? 'mp4' : 'mp3';
@@ -646,6 +805,14 @@
       var format = (formatEl && formatEl.value) ? formatEl.value : this.currentFormat;
       this.currentFormat = format;
 
+      var destinationFolder = (this.targetFolder !== undefined)
+        ? this.targetFolder
+        : (window.fileManager ? window.fileManager._currentFolder : '');
+      var sel = document.getElementById('yt-destination-folder');
+      if (sel && sel.value !== undefined) {
+        destinationFolder = sel.value;
+      }
+
       statusEl.classList.add('hidden');
       containerEl.classList.remove('hidden');
       textEl.className = 'text-xs text-accent';
@@ -658,7 +825,7 @@
       fetch('/api/youtube/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url, format: format }),
+        body: JSON.stringify({ url: url, format: format, folder: destinationFolder }),
       })
         .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
         .then(function (res) {
@@ -697,7 +864,7 @@
             textEl.className = 'text-xs text-green-400';
             textEl.textContent = tr('youtube_success') + ' (' + job.filename + ')';
             urlInput.value = '';
-            if (window.fileManager) window.fileManager.load();
+            if (window.fileManager) window.fileManager.load(window.fileManager._currentFolder);
             setTimeout(function () { containerEl.classList.add('hidden'); }, 5000);
           } else if (job.status === 'error') {
             textEl.textContent = job.error || tr('youtube_error');

@@ -142,6 +142,10 @@
   "confirm_delete_folder": "Are you sure you want to delete this folder and all its files?",
   "select_target_folder": "Select Destination Folder",
   "move_success": "File moved successfully!",
+  "yt_destination_folder": "Destination:",
+  "drop_zone_target": "Drag & drop files here to upload to:",
+  "drop_on_folder_hint": "Drop file here to move into this folder",
+  "drop_on_root_hint": "Drop here to move back to Root",
 
   "btn_stream_debug": "Stream Debug",
   "stream_debug_title": "Streaming Diagnostics & Session Recovery",

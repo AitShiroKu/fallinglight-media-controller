@@ -188,12 +188,8 @@
   }
 
   function onTrackEnded() {
-    // In remote mode, the receiver already played all loops and notified us on completion
-    if (window.audioEngine && window.audioEngine.remoteMode) {
-      advance(true);
-    } else {
-      advance(false);
-    }
+    // Both in remote and local mode, natural track ending is not a manual skip (skip = false)
+    advance(false);
   }
 
   function advance(skip) {
@@ -201,43 +197,62 @@
     var track = items[currentIndex];
     if (!track) return;
 
+    var isRemote = !!(window.audioEngine && window.audioEngine.remoteMode);
+
     if (!skip) {
-      track.currentLoop++;
-      // Check loop
-      if (track.loop === 0) {
-        // Infinite loop
-        playIndex(currentIndex, true);
-        return;
-      } else if (track.currentLoop < track.loop) {
-        playIndex(currentIndex, true);
+      // In local mode, track loop repetitions locally
+      if (!isRemote) {
+        if (track.loop === 0) {
+          // Infinite loop
+          playIndex(currentIndex, true);
+          return;
+        }
+        track.currentLoop++;
+        if (track.currentLoop < track.loop) {
+          playIndex(currentIndex, true);
+          return;
+        }
+      }
+
+      // Track has completed all its loops
+      track.currentLoop = 0;
+
+      // Check per-media autoNext setting ("เล่นต่อเมื่อจบ" vs "หยุดเมื่อจบ")
+      if (track.autoNext === false) {
+        window.audioEngine.stop();
+        var nextIdx = currentIndex + 1;
+        if (nextIdx < items.length) {
+          currentIndex = nextIdx;
+          updateTrackInfo(items[nextIdx]);
+        }
+        setStatus(tr('status_track_ended_stopped') || 'เล่นสื่อจบแล้ว (หยุดตามที่ตั้งค่าไว้)');
+        render();
         return;
       }
 
-      // Check per-media autoNext setting! (เลือกว่าเมื่อจบสื่อนี้แล้วจะเล่นสื่ออื่นต่อไหม)
-      if (track.autoNext === false) {
-        track.currentLoop = 0;
+      // Check global auto-advance setting
+      if (!configAutoAdvance) {
         window.audioEngine.stop();
+        var nextIdx = currentIndex + 1;
+        if (nextIdx < items.length) {
+          currentIndex = nextIdx;
+          updateTrackInfo(items[nextIdx]);
+        }
         setStatus(tr('status_track_ended_stopped') || 'เล่นสื่อจบแล้ว (หยุดตามที่ตั้งค่าไว้)');
         render();
         return;
       }
     }
 
-    // Advance to next
+    // Advance to next (either via manual skip or natural auto-advance)
     track.currentLoop = 0;
-
-    if (!configAutoAdvance && !skip) {
-      currentIndex = -1;
-      updateTrackInfo(null);
-      render();
-      return;
-    }
 
     var nextIdx = currentIndex + 1;
     if (nextIdx >= items.length) {
       // End of playlist
       currentIndex = -1;
       updateTrackInfo(null);
+      window.audioEngine.stop();
       setStatus(tr('status_playlist_ended'));
       render();
       return;

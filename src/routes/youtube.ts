@@ -3,8 +3,9 @@
  */
 import { Elysia, t } from "elysia";
 import { authGuard, requireAuth } from "../middleware/auth-guard";
-import { UPLOADS_DIR, sanitizeFilename, loadSettings } from "../utils/storage";
-import { join } from "node:path";
+import { UPLOADS_DIR, sanitizeFilename, sanitizeFolderName, loadSettings } from "../utils/storage";
+import { join, resolve } from "node:path";
+import { mkdir } from "node:fs/promises";
 
 const ytJobs = new Map<string, { status: "downloading" | "success" | "error"; progress: number; filename?: string; error?: string; format?: "mp3" | "mp4" }>();
 
@@ -24,13 +25,20 @@ export const youtubeRoutes = requireAuth(
 
   // POST /api/youtube/download — Start YouTube download (MP3 audio or MP4 video+audio)
   .post("/download", async ({ body, set }) => {
-    const { url, format } = body;
+    const { url, format, folder } = body;
     const isMp4 = format === "mp4";
     const targetExt = isMp4 ? "mp4" : "mp3";
+    const safeFolder = sanitizeFolderName(folder || "");
 
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       set.status = 400;
       return { error: "Invalid URL" };
+    }
+
+    const targetDir = safeFolder ? resolve(UPLOADS_DIR, safeFolder) : UPLOADS_DIR;
+    if (!targetDir.startsWith(UPLOADS_DIR)) {
+      set.status = 400;
+      return { error: "Invalid target folder" };
     }
 
     try {
@@ -49,9 +57,10 @@ export const youtubeRoutes = requireAuth(
             if (fetchedTitle) title = fetchedTitle;
           }
 
+          await mkdir(targetDir, { recursive: true });
           const safeTitle = sanitizeFilename(title) || "youtube_media";
-          const outputFilename = `${safeTitle}.${targetExt}`;
-          const outputPath = join(UPLOADS_DIR, `${safeTitle}.%(ext)s`);
+          const outputFilename = safeFolder ? `${safeFolder}/${safeTitle}.${targetExt}` : `${safeTitle}.${targetExt}`;
+          const outputPath = join(targetDir, `${safeTitle}.%(ext)s`);
 
           // 2. Load YouTube quality setting
           const settings = await loadSettings();
@@ -127,7 +136,7 @@ export const youtubeRoutes = requireAuth(
           }
           
           const exitCode = await downloadProc.exited;
-          const finalFilePath = join(UPLOADS_DIR, outputFilename);
+          const finalFilePath = join(targetDir, `${safeTitle}.${targetExt}`);
           const fileExists = await Bun.file(finalFilePath).exists();
 
           // yt-dlp might return non-zero exit code on warning but still create the file successfully
@@ -156,6 +165,7 @@ export const youtubeRoutes = requireAuth(
     body: t.Object({
       url: t.String(),
       format: t.Optional(t.Union([t.Literal("mp3"), t.Literal("mp4")])),
+      folder: t.Optional(t.String()),
     }),
   })
 );
