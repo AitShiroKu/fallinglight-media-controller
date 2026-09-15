@@ -26,32 +26,121 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="/js/icons.js?v=1.2.1"></script>
   <style>
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; }
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #161b22; }
     ::-webkit-scrollbar-thumb { background: #2a3352; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #e94560; }
-    input[type="range"] { -webkit-appearance: none; background: transparent; }
-    input[type="range"]::-webkit-slider-runnable-track { height: 6px; background: #1c2333; border-radius: 3px; }
-    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #e94560; margin-top: -5px; cursor: pointer; }
-    input[type="range"]::-webkit-slider-thumb:hover { background: #ff6b81; transform: scale(1.15); }
+    
+    /* Touch target utilities (min 44px on desktop, 48px on touch) */
+    .touch-btn {
+      min-height: 44px;
+      min-width: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .touch-btn:active, button:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+    @media (pointer: coarse) {
+      .touch-btn {
+        min-height: 48px;
+        min-width: 48px;
+      }
+    }
+
+    /* Range slider with larger touch hit area and 24-28px finger thumb */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      touch-action: none;
+      height: 36px;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 8px;
+      background: #1c2333;
+      border-radius: 4px;
+      border: 1px solid rgba(42,51,82,0.7);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #e94560;
+      margin-top: -7px;
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(233,69,96,0.6);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #ff6b81;
+      transform: scale(1.15);
+    }
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(1.25);
+      background: #ff6b81;
+    }
+    @media (pointer: coarse), (max-width: 768px) {
+      input[type="range"] {
+        height: 44px;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        height: 10px;
+        border-radius: 5px;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        width: 28px;
+        height: 28px;
+        margin-top: -9px;
+      }
+    }
+
     .vu-bar { transition: height 0.08s ease-out; }
-    .tab-btn.active { border-color: #e94560; color: #e94560; }
+    
+    /* Active Navigation Tab */
+    .tab-btn.active {
+      border-color: #e94560;
+      color: #e94560;
+    }
+    @media (max-width: 767px) {
+      .tab-btn.active {
+        background: rgba(233, 69, 96, 0.08);
+      }
+    }
+
     .drag-over { outline: 2px dashed #e94560; outline-offset: -4px; background: rgba(233,69,96,0.05) !important; }
-    .playlist-row.playing { background: rgba(233,69,96,0.12) !important; }
-    .playlist-row:hover { background: rgba(42,51,82,0.6) !important; }
+    .playlist-row.playing { background: rgba(233,69,96,0.14) !important; border-left: 3px solid #e94560; }
+    .playlist-row:hover { background: rgba(42,51,82,0.5) !important; }
+    
     .mic-pulse { animation: pulse 1.2s ease-in-out infinite; }
-    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(233,69,96,0.5); } 50% { box-shadow: 0 0 0 12px rgba(233,69,96,0); } }
-    .fade-in { animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    .modal-backdrop { backdrop-filter: blur(4px); }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(233,69,96,0.6); }
+      50% { box-shadow: 0 0 0 14px rgba(233,69,96,0); }
+    }
+    
+    .fade-in { animation: fadeIn 0.25s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .modal-backdrop { backdrop-filter: blur(6px); }
     .pulse-waiting { animation: pulseWait 2s ease-in-out infinite; }
     @keyframes pulseWait { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
 
-    /* Responsive Styles for Mobile/Tablet */
-    @media (max-width: 900px) {
+    /* Responsive Mobile Layout */
+    @media (max-width: 768px) {
       #app-screen {
         height: auto !important;
         min-height: 100vh;
@@ -61,16 +150,17 @@
       main {
         overflow: visible !important;
         flex: 1 0 auto !important;
+        padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)) !important;
       }
       .tab-content {
         height: auto !important;
       }
       
-      /* Player Tab */
+      /* Player Tab mobile card layout */
       #tab-player {
         flex-direction: column !important;
         padding: 0.75rem !important;
-        gap: 0.75rem !important;
+        gap: 0.85rem !important;
       }
       #tab-player > div:first-child {
         width: 100% !important;
@@ -78,66 +168,84 @@
       }
       #tab-player > div:last-child {
         width: 100% !important;
-        height: 400px !important;
+        height: auto !important;
+        min-height: 380px !important;
         flex-shrink: 0 !important;
       }
 
-      /* Files Tab Layout */
+      /* Files Tab mobile layout */
       #tab-files {
         padding: 0.75rem !important;
         gap: 0.75rem !important;
       }
       #tab-files > div:last-child {
-        height: 350px !important;
+        height: 360px !important;
         flex-shrink: 0 !important;
       }
 
-      /* Schedule Tab Layout */
+      /* Schedule Tab mobile layout */
       #tab-schedule {
         padding: 0.75rem !important;
         gap: 0.75rem !important;
       }
       #tab-schedule > div:last-child {
-        height: 350px !important;
+        height: 360px !important;
         flex-shrink: 0 !important;
       }
 
-      /* Settings Tab Layout */
+      /* Settings Tab */
       #tab-settings {
-        padding: 1rem !important;
+        padding: 0.75rem !important;
         height: auto !important;
       }
     }
 
-    @media (max-width: 640px) {
-      header {
-        padding-left: 0.75rem !important;
-        padding-right: 0.75rem !important;
-        gap: 0.5rem !important;
-      }
-      header h1 {
-        font-size: 1rem !important;
-      }
-      #btn-lang, #btn-streaming, #btn-logout {
-        padding: 0.25rem 0.5rem !important;
-        font-size: 10px !important;
-      }
-      nav {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-      }
-      nav button {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-        font-size: 13px !important;
-        flex: 1;
-        text-align: center;
-      }
-      #modal-content {
-        margin-left: 1rem;
-        margin-right: 1rem;
-        padding: 1rem !important;
-      }
+    /* Video Fullscreen Mode (Controller Deck) */
+    #video-preview-container:fullscreen,
+    #video-preview-container:-webkit-full-screen,
+    #video-preview-container.is-fullscreen {
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      border: none !important;
+      border-radius: 0 !important;
+      background-color: #000000 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow: hidden !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      z-index: 999999 !important;
+    }
+
+    #video-preview-container:fullscreen #controller-video,
+    #video-preview-container:-webkit-full-screen #controller-video,
+    #video-preview-container.is-fullscreen #controller-video {
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      object-fit: contain !important;
+      background-color: #000000 !important;
+    }
+
+    #video-preview-container:fullscreen .top-2,
+    #video-preview-container:-webkit-full-screen .top-2,
+    #video-preview-container.is-fullscreen .top-2 {
+      top: 1.25rem !important;
+      right: 1.25rem !important;
+    }
+
+    #video-preview-container:fullscreen .bottom-2,
+    #video-preview-container:-webkit-full-screen .bottom-2,
+    #video-preview-container.is-fullscreen .bottom-2 {
+      bottom: 1.25rem !important;
+      left: 1.25rem !important;
     }
   </style>
 </head>
@@ -147,7 +255,9 @@
   <div id="login-screen" class="flex items-center justify-center min-h-screen">
     <div class="bg-dark-800 border border-dark-500 rounded-2xl p-8 w-full max-w-md shadow-2xl fade-in">
       <div class="text-center mb-8">
-        <div class="text-5xl mb-3">🎛</div>
+        <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-accent/20 border border-accent/40 flex items-center justify-center text-accent shadow-lg shadow-accent/20">
+          <span data-icon="radio" data-icon-size="32"></span>
+        </div>
         <h1 class="text-2xl font-bold text-accent">FallingLight</h1>
         <p class="text-muted text-sm mt-1" data-i18n="login_subtitle">Media Controller — PR Room</p>
       </div>
@@ -155,16 +265,16 @@
         <div>
           <label class="block text-sm text-muted mb-1" data-i18n="label_username">Username</label>
           <input id="login-user" type="text" autocomplete="username"
-            class="w-full bg-dark-900 border border-dark-500 rounded-lg px-4 py-3 text-gray-200 focus:border-accent focus:outline-none transition" placeholder="admin">
+            class="w-full bg-dark-900 border border-dark-500 rounded-xl px-4 py-3.5 text-gray-200 focus:border-accent focus:outline-none transition text-base" placeholder="admin">
         </div>
         <div>
           <label class="block text-sm text-muted mb-1" data-i18n="label_password">Password</label>
           <input id="login-pass" type="password" autocomplete="current-password"
-            class="w-full bg-dark-900 border border-dark-500 rounded-lg px-4 py-3 text-gray-200 focus:border-accent focus:outline-none transition" placeholder="••••••••">
+            class="w-full bg-dark-900 border border-dark-500 rounded-xl px-4 py-3.5 text-gray-200 focus:border-accent focus:outline-none transition text-base" placeholder="••••••••">
         </div>
         <div id="login-error" class="text-accent text-sm text-center hidden"></div>
         <button type="submit"
-          class="w-full bg-accent hover:bg-accent-light text-white font-bold py-3 rounded-lg transition transform hover:scale-[1.02] active:scale-[0.98]"
+          class="w-full min-h-[48px] bg-accent hover:bg-accent-light text-white font-bold py-3 rounded-xl transition transform active:scale-[0.98] shadow-lg shadow-accent/30 text-base"
           data-i18n="btn_login">Login</button>
       </form>
     </div>
@@ -174,47 +284,72 @@
   <div id="app-screen" class="hidden flex flex-col h-screen">
 
     <!-- Red Warning Banner -->
-    <div id="pr-warning-banner" class="bg-red-600/90 text-white px-6 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-red-500 flex-shrink-0">
+    <div id="pr-warning-banner" class="bg-red-600/90 text-white px-4 sm:px-6 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-red-500 flex-shrink-0">
       <div class="flex items-center gap-2">
-        <span class="text-sm animate-pulse">⚠️</span>
+        <span data-icon="warning" data-icon-size="16" class="animate-pulse"></span>
         <span data-i18n="pr_warning_text">ระบบนี้จำเป็นต้องใช้ในห้องประชาสัมพันธ์ และต้องทำงานตลอดเวลา (ห้ามปิดหน้าเว็บหรือออกจากระบบ)</span>
       </div>
-      <button onclick="document.getElementById('pr-warning-banner').classList.add('hidden')" class="text-white/80 hover:text-white text-xs px-2 py-0.5 rounded hover:bg-red-700 transition" title="ซ่อนชั่วคราว">✕</button>
+      <button onclick="document.getElementById('pr-warning-banner').classList.add('hidden')" class="touch-btn h-8 w-8 rounded-lg text-white/80 hover:text-white hover:bg-red-700 transition" title="ซ่อนชั่วคราว">
+        <span data-icon="x" data-icon-size="14"></span>
+      </button>
     </div>
 
     <!-- Header -->
-    <header class="bg-dark-800 border-b border-dark-500 px-6 py-3 flex items-center gap-4 flex-shrink-0">
-      <span class="text-xl">🎛</span>
-      <h1 class="text-lg font-bold text-accent">FallingLight</h1>
-      <span class="text-muted text-sm hidden sm:inline" data-i18n="header_subtitle">Media Controller</span>
-      <div class="flex-1"></div>
-      <button id="btn-lang" onclick="window.appI18n.toggle()"
-        class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs font-bold hover:border-accent transition">TH</button>
-      <div class="flex items-center gap-2">
-        <button id="btn-streaming" onclick="window.streamController.toggle()"
-          class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent hover:text-accent transition">
-          📡 <span data-i18n="streaming_enable">Streaming</span>
-        </button>
-        <span id="streaming-badge" class="hidden text-xs text-yellow-400 font-bold"></span>
+    <header class="bg-dark-800 border-b border-dark-500 px-4 sm:px-6 py-2.5 flex items-center gap-3 flex-shrink-0">
+      <div class="w-9 h-9 rounded-xl bg-accent/20 border border-accent/40 flex items-center justify-center text-accent shadow-sm shadow-accent/20 shrink-0">
+        <span data-icon="radio" data-icon-size="20"></span>
       </div>
-      <button id="btn-logout" onclick="window.appAuth.logout()"
-        class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent hover:text-accent transition"
-        data-i18n="btn_logout">Logout</button>
+      <div class="flex flex-col">
+        <h1 class="text-base sm:text-lg font-bold text-accent tracking-tight leading-tight">FallingLight</h1>
+        <span class="text-muted text-[11px] hidden sm:inline" data-i18n="header_subtitle">Media Controller</span>
+      </div>
+      <div class="flex-1"></div>
+      
+      <!-- Header Actions (Touch Friendly) -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <button id="btn-lang" onclick="window.appI18n.toggle()"
+          class="touch-btn h-10 px-3 bg-dark-700 hover:bg-dark-600 border border-dark-500/80 rounded-xl text-xs font-bold text-gray-200 hover:text-white hover:border-accent transition flex items-center gap-1.5 shadow-sm">
+          <span data-icon="globe" data-icon-size="15" class="text-muted"></span>
+          <span id="lang-label">TH</span>
+        </button>
+        <button id="btn-streaming" onclick="window.streamController.toggle()"
+          class="touch-btn h-10 px-3 bg-dark-700 hover:bg-dark-600 border border-dark-500/80 rounded-xl text-xs font-semibold text-gray-200 hover:text-white hover:border-accent transition flex items-center gap-1.5 shadow-sm">
+          <span data-icon="broadcast" data-icon-size="15" class="text-accent"></span>
+          <span class="hidden sm:inline" data-i18n="streaming_enable">Streaming</span>
+        </button>
+        <button id="btn-stream-debug" onclick="window.streamController.openDebugModal()"
+          class="touch-btn h-10 px-2.5 bg-dark-700 hover:bg-dark-600 border border-dark-500/80 rounded-xl text-xs font-semibold text-gray-200 hover:text-white hover:border-accent transition flex items-center gap-1.5 shadow-sm"
+          title="Streaming Diagnostics & Force Clear">
+          <span data-icon="wrench" data-icon-size="15" class="text-cyan-400"></span>
+          <span class="hidden md:inline" data-i18n="btn_stream_debug">Stream Debug</span>
+        </button>
+        <span id="streaming-badge" class="hidden text-xs text-yellow-400 font-bold px-2 py-1 bg-yellow-500/10 rounded-lg border border-yellow-500/30"></span>
+        <button id="btn-logout" onclick="window.appAuth.logout()"
+          class="touch-btn h-10 px-3 bg-dark-700 hover:bg-red-500/10 border border-dark-500/80 hover:border-red-500/40 rounded-xl text-xs font-semibold text-muted hover:text-red-400 transition flex items-center gap-1.5 shadow-sm"
+          data-i18n="btn_logout">
+          <span data-icon="logout" data-icon-size="15"></span>
+          <span class="hidden sm:inline">Logout</span>
+        </button>
+      </div>
     </header>
 
-    <!-- Tabs -->
-    <nav class="bg-dark-800 px-6 flex gap-1 border-b border-dark-500 flex-shrink-0">
-      <button class="tab-btn active px-5 py-3 text-sm font-medium border-b-2 border-transparent hover:text-accent transition" data-tab="player">
-        🎵 <span data-i18n="tab_player">Player</span>
+    <!-- Navigation Tabs (Top on Desktop, Fixed Bottom Dock on Mobile) -->
+    <nav class="bg-dark-800/95 md:bg-dark-800 backdrop-blur-xl md:backdrop-blur-none border-t md:border-t-0 md:border-b border-dark-500 fixed md:static bottom-0 inset-x-0 z-40 px-2 md:px-6 flex justify-around md:justify-start gap-1 md:gap-2 flex-shrink-0 h-16 md:h-12 pb-[env(safe-area-inset-bottom)] md:pb-0 shadow-2xl md:shadow-none">
+      <button class="tab-btn active flex-1 md:flex-initial flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 py-1 md:py-3 px-2 md:px-5 text-xs md:text-sm font-medium border-t-2 md:border-t-0 md:border-b-2 border-transparent transition touch-btn text-muted hover:text-accent" data-tab="player">
+        <span data-icon="music" data-icon-size="18"></span>
+        <span class="text-[11px] md:text-sm tracking-tight" data-i18n="tab_player">Player</span>
       </button>
-      <button class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent hover:text-accent transition" data-tab="schedule">
-        📅 <span data-i18n="tab_schedule">Schedule</span>
+      <button class="tab-btn flex-1 md:flex-initial flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 py-1 md:py-3 px-2 md:px-5 text-xs md:text-sm font-medium border-t-2 md:border-t-0 md:border-b-2 border-transparent transition touch-btn text-muted hover:text-accent" data-tab="schedule">
+        <span data-icon="calendar" data-icon-size="18"></span>
+        <span class="text-[11px] md:text-sm tracking-tight" data-i18n="tab_schedule">Schedule</span>
       </button>
-      <button class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent hover:text-accent transition" data-tab="files">
-        📁 <span data-i18n="tab_files">Files</span>
+      <button class="tab-btn flex-1 md:flex-initial flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 py-1 md:py-3 px-2 md:px-5 text-xs md:text-sm font-medium border-t-2 md:border-t-0 md:border-b-2 border-transparent transition touch-btn text-muted hover:text-accent" data-tab="files">
+        <span data-icon="folder" data-icon-size="18"></span>
+        <span class="text-[11px] md:text-sm tracking-tight" data-i18n="tab_files">Files</span>
       </button>
-      <button class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent hover:text-accent transition" data-tab="settings">
-        ⚙️ <span data-i18n="tab_settings">Settings</span>
+      <button class="tab-btn flex-1 md:flex-initial flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 py-1 md:py-3 px-2 md:px-5 text-xs md:text-sm font-medium border-t-2 md:border-t-0 md:border-b-2 border-transparent transition touch-btn text-muted hover:text-accent" data-tab="settings">
+        <span data-icon="settings" data-icon-size="18"></span>
+        <span class="text-[11px] md:text-sm tracking-tight" data-i18n="tab_settings">Settings</span>
       </button>
     </nav>
 
@@ -222,79 +357,110 @@
     <main class="flex-1 overflow-hidden">
 
       <!-- ──── PLAYER TAB ──── -->
-      <div id="tab-player" class="tab-content h-full flex gap-4 p-4">
+      <div id="tab-player" class="tab-content h-full flex gap-4 p-3 sm:p-4">
 
         <!-- Left: Player Controls -->
-        <div class="bg-dark-800 border border-dark-500 rounded-xl p-5 flex flex-col gap-4 w-[420px] flex-shrink-0">
+        <div class="bg-dark-800 border border-dark-500 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 w-full md:w-[420px] flex-shrink-0 shadow-lg">
 
-          <!-- Now Playing -->
-          <div class="text-center">
-            <div id="track-title" class="text-lg font-bold truncate" data-i18n="no_track">No Track Loaded</div>
-            <div id="track-source" class="text-xs text-muted mt-1"></div>
+          <!-- Now Playing Card -->
+          <div class="text-center bg-dark-900/60 border border-dark-500/60 rounded-xl p-3">
+            <div id="track-title" class="text-base sm:text-lg font-bold truncate text-white" data-i18n="no_track">No Track Loaded</div>
+            <div id="track-source" class="text-xs text-muted mt-1 truncate"></div>
+          </div>
+
+          <!-- Video Preview Player Deck -->
+          <div id="video-preview-container" class="hidden rounded-xl overflow-hidden bg-black border border-dark-500/80 shadow-md relative group">
+            <video id="controller-video" class="w-full aspect-video max-h-[220px] object-contain bg-black cursor-pointer" playsinline ondblclick="window.audioEngine.toggleVideoFullscreen()"></video>
+            <!-- Overlay controls -->
+            <div class="absolute top-2 right-2 flex items-center gap-1.5 opacity-75 hover:opacity-100 transition">
+              <button id="btn-video-pip" onclick="window.audioEngine.toggleVideoPip()" class="touch-btn h-7 w-7 rounded-lg bg-dark-900/80 hover:bg-dark-800 text-white flex items-center justify-center shadow" title="Picture-in-Picture">
+                <span data-icon="pip" data-icon-size="14"></span>
+              </button>
+              <button id="btn-video-fullscreen" onclick="window.audioEngine.toggleVideoFullscreen()" class="touch-btn h-7 w-7 rounded-lg bg-dark-900/80 hover:bg-dark-800 text-white flex items-center justify-center shadow" title="Fullscreen">
+                <span data-icon="maximize" data-icon-size="14"></span>
+              </button>
+            </div>
+            <!-- Video Badge / Status -->
+            <div class="absolute bottom-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] text-gray-300 pointer-events-none">
+              <span data-icon="video" data-icon-size="10" class="text-accent"></span>
+              <span id="video-preview-label">VIDEO PREVIEW</span>
+            </div>
           </div>
 
           <!-- VU Meters + Progress -->
           <div class="flex items-end gap-3">
             <!-- VU Left -->
             <div class="flex flex-col items-center gap-1">
-              <div class="w-5 h-32 bg-dark-900 rounded border border-dark-500 overflow-hidden flex flex-col-reverse">
+              <div class="w-4 sm:w-5 h-28 sm:h-32 bg-dark-900 rounded border border-dark-500 overflow-hidden flex flex-col-reverse shadow-inner">
                 <div id="vu-left" class="vu-bar w-full rounded" style="height:0%;background:linear-gradient(to top,#3fb950 60%,#d29922 80%,#e94560 100%)"></div>
               </div>
-              <span class="text-[10px] text-muted">L</span>
+              <span class="text-[10px] text-muted font-mono">L</span>
             </div>
             <!-- VU Right -->
             <div class="flex flex-col items-center gap-1">
-              <div class="w-5 h-32 bg-dark-900 rounded border border-dark-500 overflow-hidden flex flex-col-reverse">
+              <div class="w-4 sm:w-5 h-28 sm:h-32 bg-dark-900 rounded border border-dark-500 overflow-hidden flex flex-col-reverse shadow-inner">
                 <div id="vu-right" class="vu-bar w-full rounded" style="height:0%;background:linear-gradient(to top,#3fb950 60%,#d29922 80%,#e94560 100%)"></div>
               </div>
-              <span class="text-[10px] text-muted">R</span>
+              <span class="text-[10px] text-muted font-mono">R</span>
             </div>
             <!-- Progress + Time -->
             <div class="flex-1 flex flex-col gap-2">
               <input id="seek-bar" type="range" min="0" max="1000" value="0" class="w-full cursor-pointer" oninput="window.audioEngine.seekTo(this.value/1000)">
-              <div class="flex justify-between text-xs text-muted font-mono">
+              <div class="flex justify-between text-xs text-muted font-mono px-0.5">
                 <span id="time-current">0:00</span>
                 <span id="time-total">0:00</span>
               </div>
             </div>
           </div>
 
-          <!-- Transport -->
-          <div class="flex items-center justify-center gap-3">
-            <button onclick="window.playlist.previous()" class="w-10 h-10 rounded-full bg-dark-600 hover:bg-dark-500 transition text-lg" title="Previous">⏮</button>
-            <button onclick="window.audioEngine.stopWithFade()" class="w-10 h-10 rounded-full bg-dark-600 hover:bg-dark-500 transition text-lg" title="Stop">⏹</button>
-            <button id="btn-play" onclick="window.playlist.togglePlay()" class="w-14 h-14 rounded-full bg-accent hover:bg-accent-light transition text-2xl text-white" title="Play">▶</button>
-            <button onclick="window.playlist.next()" class="w-10 h-10 rounded-full bg-dark-600 hover:bg-dark-500 transition text-lg" title="Next">⏭</button>
-          </div>
-
-          <!-- Volume + Mic -->
-          <div class="flex items-center gap-3">
-            <button id="btn-mute" onclick="window.audioEngine.toggleMute()" class="text-lg w-8">🔊</button>
-            <input id="vol-slider" type="range" min="0" max="100" value="80" class="flex-1" oninput="window.audioEngine.setVolume(this.value/100)">
+          <!-- Volume & Controls -->
+          <div class="flex items-center gap-3 bg-dark-900/40 p-2 rounded-xl border border-dark-500/50">
+            <button id="btn-mute" onclick="window.audioEngine.toggleMute()" class="touch-btn w-10 h-10 rounded-lg text-muted hover:text-white transition" title="Mute">
+              <span data-icon="volume" data-icon-size="20"></span>
+            </button>
+            <input id="vol-slider" type="range" min="0" max="100" value="80" class="flex-1 cursor-pointer" oninput="window.audioEngine.setVolume(this.value/100)">
             <span id="vol-label" class="text-xs text-muted font-mono w-10 text-right">80%</span>
           </div>
+
+          <!-- Playback Buttons (Touch-Optimized) -->
+          <div class="flex items-center justify-center gap-5 sm:gap-6 py-1">
+            <button onclick="window.playlist.previous()" class="touch-btn w-12 h-12 rounded-full bg-dark-700 hover:bg-dark-600 text-gray-200 hover:text-white border border-dark-500/60 shadow-md flex items-center justify-center" title="Previous">
+              <span data-icon="skip-back" data-icon-size="20"></span>
+            </button>
+            <button id="btn-play" onclick="window.playlist.togglePlay()" class="touch-btn w-16 h-16 rounded-full bg-accent hover:bg-accent-light text-white flex items-center justify-center shadow-xl shadow-accent/40 border-2 border-accent-light/30" title="Play / Pause">
+              <span data-icon="play" data-icon-size="28"></span>
+            </button>
+            <button onclick="window.playlist.next()" class="touch-btn w-12 h-12 rounded-full bg-dark-700 hover:bg-dark-600 text-gray-200 hover:text-white border border-dark-500/60 shadow-md flex items-center justify-center" title="Next">
+              <span data-icon="skip-forward" data-icon-size="20"></span>
+            </button>
+          </div>
+
+          <!-- Mic Ducking Button (Tactile Broadcast Control) -->
           <button id="btn-mic" onclick="window.audioEngine.toggleDuck()"
-            class="w-full py-3 rounded-xl border-2 border-yellow-500 text-yellow-400 font-bold text-lg hover:bg-yellow-500/10 transition">
-            🎙 <span data-i18n="btn_mic">MIC / PR</span>
+            class="touch-btn w-full min-h-[50px] py-3.5 px-4 bg-dark-700 hover:bg-dark-600 border border-dark-500 rounded-2xl font-bold text-sm flex items-center justify-center gap-2.5 shadow-md">
+            <span data-icon="mic" data-icon-size="20" class="text-yellow-400"></span>
+            <span data-i18n="btn_mic">Mic / PR Room</span>
           </button>
         </div>
 
         <!-- Right: Playlist -->
-        <div class="flex-1 bg-dark-800 border border-dark-500 rounded-xl p-4 flex flex-col gap-3 overflow-hidden">
-          <!-- Playlist Header -->
-          <div class="flex items-center gap-3">
+        <div class="flex-1 bg-dark-800 border border-dark-500 rounded-xl p-4 sm:p-5 flex flex-col gap-3 overflow-hidden">
+          <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
             <h2 class="text-sm font-bold text-accent flex-1" data-i18n="playlist_title">Playlist</h2>
-            <label class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent transition cursor-pointer flex items-center gap-1">
-              ⬆️ <span data-i18n="btn_upload_add">Upload & Add</span>
+            <label class="touch-btn min-h-[38px] flex items-center gap-1.5 px-3 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-xl shadow-md shadow-accent/20 cursor-pointer">
               <input type="file" multiple accept=".mp3,.mp4,.wav,.flac,.ogg,.m4a,.aac,.wma,.avi,.mkv,.webm" class="hidden" onchange="window.playlist.uploadAndAdd(this.files)">
+              <span data-icon="upload" data-icon-size="16"></span>
+              <span data-i18n="btn_upload_add">Upload & Add</span>
             </label>
             <button onclick="window.playlist.addFromFiles()"
-              class="px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent transition">
-              📁 <span data-i18n="btn_add_file">Add File</span>
+              class="touch-btn min-h-[38px] px-3 py-2 bg-dark-600 hover:bg-dark-500 border border-dark-500 rounded-xl text-xs font-semibold hover:border-accent flex items-center gap-1.5">
+              <span data-icon="folder" data-icon-size="16" class="text-yellow-400"></span>
+              <span data-i18n="btn_add_file">Add File</span>
             </button>
             <button onclick="window.playlist.clearAll()"
-              class="px-3 py-1.5 bg-dark-600 border border-accent/50 rounded-lg text-xs text-accent hover:bg-accent/10 transition">
-              🗑 <span data-i18n="btn_clear">Clear</span>
+              class="touch-btn min-h-[38px] px-3 py-2 bg-dark-600 hover:bg-red-500/20 border border-accent/40 rounded-xl text-xs text-accent hover:text-red-400 flex items-center gap-1.5">
+              <span data-icon="trash" data-icon-size="16"></span>
+              <span data-i18n="btn_clear">Clear</span>
             </button>
           </div>
           <!-- Playlist Table -->
@@ -302,15 +468,16 @@
             <table class="w-full text-sm">
               <thead class="bg-dark-700 sticky top-0 z-10">
                 <tr class="text-muted text-xs uppercase">
-                  <th class="px-3 py-2 text-left w-8">#</th>
+                  <th class="px-3 py-2 text-center w-8">#</th>
                   <th class="px-3 py-2 text-left" data-i18n="col_title">Title</th>
                   <th class="px-3 py-2 text-center w-16" data-i18n="col_loop">Loop</th>
                   <th class="px-3 py-2 text-center w-12" data-i18n="col_left">Left</th>
+                  <th class="px-2 py-2 text-center w-24" data-i18n="col_autonext">Auto-Next</th>
                   <th class="px-3 py-2 text-center w-16" data-i18n="col_actions">Act</th>
                 </tr>
               </thead>
               <tbody id="playlist-body" class="divide-y divide-dark-500">
-                <tr><td colspan="5" class="px-3 py-8 text-center text-muted text-xs" data-i18n="playlist_empty">Playlist is empty — add tracks to begin</td></tr>
+                <tr><td colspan="6" class="px-3 py-8 text-center text-muted text-xs" data-i18n="playlist_empty">Playlist is empty — add tracks to begin</td></tr>
               </tbody>
             </table>
           </div>
@@ -320,18 +487,21 @@
 
       <!-- ──── SCHEDULE TAB ──── -->
       <div id="tab-schedule" class="tab-content hidden h-full p-4 flex flex-col gap-4">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
           <h2 class="text-sm font-bold text-accent flex-1" data-i18n="schedule_title">Scheduled Playback</h2>
           <button onclick="window.schedulerUI.openAdd()"
-            class="px-4 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-lg transition">
-            ➕ <span data-i18n="btn_add_schedule">Add Schedule</span>
+            class="touch-btn min-h-[40px] px-4 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-xl shadow-md shadow-accent/20 flex items-center gap-1.5">
+            <span data-icon="plus" data-icon-size="16"></span>
+            <span data-i18n="btn_add_schedule">Add Schedule</span>
           </button>
           <button onclick="window.schedulerUI.exportJSON()"
-            class="px-3 py-2 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent transition">
-            📤 <span data-i18n="btn_export">Export</span>
+            class="touch-btn min-h-[40px] px-3 py-2 bg-dark-600 hover:bg-dark-500 border border-dark-500 rounded-xl text-xs font-semibold hover:border-accent flex items-center gap-1.5">
+            <span data-icon="download" data-icon-size="16"></span>
+            <span data-i18n="btn_export">Export</span>
           </button>
-          <label class="px-3 py-2 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent transition cursor-pointer">
-            📥 <span data-i18n="btn_import">Import</span>
+          <label class="touch-btn min-h-[40px] px-3 py-2 bg-dark-600 hover:bg-dark-500 border border-dark-500 rounded-xl text-xs font-semibold hover:border-accent cursor-pointer flex items-center gap-1.5">
+            <span data-icon="upload" data-icon-size="16"></span>
+            <span data-i18n="btn_import">Import</span>
             <input type="file" accept=".json" class="hidden" onchange="window.schedulerUI.importJSON(this.files[0])">
           </label>
         </div>
@@ -357,38 +527,100 @@
 
       <!-- ──── FILES TAB ──── -->
       <div id="tab-files" class="tab-content hidden h-full p-4 flex flex-col gap-4">
-        <div class="flex items-center gap-3">
-          <h2 class="text-sm font-bold text-accent flex-1" data-i18n="files_title">Media Files</h2>
-          <input id="files-search" type="text"
-            class="w-48 bg-dark-900 border border-dark-500 rounded-lg px-3 py-2 text-sm focus:border-accent focus:outline-none"
-            placeholder="Search files..." data-i18n="search_files_placeholder"
-            oninput="window.fileManager.search(this.value)">
-          <label id="upload-btn"
-            class="px-4 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-lg transition cursor-pointer">
-            ⬆ <span data-i18n="btn_upload">Upload</span>
-            <input type="file" multiple accept=".mp3,.mp4,.wav,.flac,.ogg,.m4a,.aac,.wma,.avi,.mkv,.webm" class="hidden" onchange="window.fileManager.upload(this.files)">
-          </label>
+        <!-- Top Toolbar with Breadcrumbs & Actions -->
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-dark-800/80 p-3 rounded-xl border border-dark-500">
+          <div class="flex items-center gap-2 flex-1 min-w-[240px]">
+            <span class="text-sm font-bold text-accent" data-i18n="files_title">Media Files</span>
+            <span class="text-dark-500">/</span>
+            <!-- Folder Breadcrumbs -->
+            <div id="folder-breadcrumb" class="flex items-center gap-1.5 text-xs text-muted overflow-x-auto">
+              <span class="cursor-pointer hover:text-white font-medium" onclick="window.fileManager.navigateTo('')" data-i18n="folder_root">Root</span>
+            </div>
+          </div>
+          
+          <div class="flex items-center gap-2 flex-wrap">
+            <input id="files-search" type="text"
+              class="w-36 md:w-52 bg-dark-900 border border-dark-500 rounded-xl px-3 py-2 text-xs focus:border-accent focus:outline-none"
+              placeholder="Search files..." data-i18n="search_files_placeholder"
+              oninput="window.fileManager.search(this.value)">
+            
+            <button id="btn-play-folder" onclick="window.fileManager.playCurrentFolder()"
+              class="touch-btn min-h-[38px] px-3 py-2 bg-dark-600 hover:bg-dark-500 text-green-400 border border-green-500/30 text-xs font-semibold rounded-xl flex items-center gap-1.5"
+              title="Play all files in this folder as a playlist">
+              <span data-icon="play" data-icon-size="14"></span>
+              <span data-i18n="btn_play_folder">Play Folder</span>
+            </button>
+
+            <button id="btn-new-folder" onclick="window.fileManager.openCreateFolderModal()"
+              class="touch-btn min-h-[38px] px-3 py-2 bg-dark-600 hover:bg-dark-500 text-gray-200 border border-dark-500 text-xs font-semibold rounded-xl flex items-center gap-1.5">
+              <span data-icon="plus" data-icon-size="14"></span>
+              <span data-i18n="btn_new_folder">New Folder</span>
+            </button>
+
+            <label id="upload-btn"
+              class="touch-btn min-h-[38px] px-3.5 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-1.5 shadow-md shadow-accent/20">
+              <span data-icon="upload" data-icon-size="14"></span>
+              <span data-i18n="btn_upload">Upload</span>
+              <input type="file" multiple accept=".mp3,.mp4,.wav,.flac,.ogg,.m4a,.aac,.wma,.avi,.mkv,.webm" class="hidden" onchange="window.fileManager.upload(this.files)">
+            </label>
+          </div>
         </div>
+
+        <!-- Folders Cards Container -->
+        <div id="folders-section" class="bg-dark-800/50 border border-dark-500/60 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs font-semibold text-muted uppercase tracking-wider flex items-center gap-1.5">
+              <span data-icon="folder" data-icon-size="16" class="text-yellow-400"></span>
+              <span data-i18n="tab_files_folder">Folders</span>
+            </div>
+            <span id="folders-count" class="text-[11px] text-muted font-mono">0 folders</span>
+          </div>
+          <div id="folders-container" class="flex flex-wrap gap-2 items-center">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
         <!-- Upload drop zone + YouTube Downloader layout -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Left: Drag & Drop upload -->
           <div id="drop-zone"
-            class="border-2 border-dashed border-dark-500 rounded-xl p-6 text-center text-muted text-sm hover:border-accent/50 transition flex flex-col justify-center min-h-[120px]"
+            class="border-2 border-dashed border-dark-500 rounded-xl p-5 text-center text-muted text-xs hover:border-accent/50 transition flex flex-col justify-center min-h-[100px]"
             data-i18n="drop_zone_text">
             Drag & drop files here or click Upload above
           </div>
           <!-- Right: YouTube Downloader -->
-          <div class="bg-dark-800 border border-dark-500 rounded-xl p-5 flex flex-col justify-center gap-3">
-            <h3 class="text-sm font-bold text-accent" data-i18n="youtube_title">YouTube Downloader</h3>
+          <div class="bg-dark-800 border border-dark-500 rounded-xl p-4 flex flex-col justify-center gap-2.5">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <span data-icon="youtube" data-icon-size="18" class="text-red-500"></span>
+                <h3 class="text-xs font-bold text-accent" data-i18n="youtube_title">YouTube Downloader</h3>
+              </div>
+              <!-- Format Selector: MP3 (Audio) vs MP4 (Video + Audio) -->
+              <div class="flex items-center bg-dark-900 border border-dark-500 rounded-lg p-0.5 text-xs">
+                <label id="yt-format-mp3-label" for="yt-format-mp3" class="flex items-center gap-1.5 px-2.5 py-1 rounded cursor-pointer transition select-none bg-accent text-white min-h-[30px]" onclick="window.youtubeDownloader.setFormat('mp3')">
+                  <input type="radio" id="yt-format-mp3" name="yt-format" value="mp3" checked class="sr-only" onchange="window.youtubeDownloader.setFormat('mp3')">
+                  <span data-icon="music" data-icon-size="12"></span>
+                  <span class="text-[11px] font-bold" data-i18n="yt_format_mp3">MP3 (Audio)</span>
+                </label>
+                <label id="yt-format-mp4-label" for="yt-format-mp4" class="flex items-center gap-1.5 px-2.5 py-1 rounded cursor-pointer transition select-none text-muted hover:text-white min-h-[30px]" onclick="window.youtubeDownloader.setFormat('mp4')">
+                  <input type="radio" id="yt-format-mp4" name="yt-format" value="mp4" class="sr-only" onchange="window.youtubeDownloader.setFormat('mp4')">
+                  <span data-icon="video" data-icon-size="12"></span>
+                  <span class="text-[11px] font-bold" data-i18n="yt_format_mp4">MP4 (Video)</span>
+                </label>
+              </div>
+            </div>
             <div class="flex gap-2">
-              <input id="yt-url" type="text" class="flex-1 bg-dark-900 border border-dark-500 rounded-lg px-3 py-2 text-sm focus:border-accent focus:outline-none" placeholder="Paste YouTube URL here..." data-i18n="youtube_placeholder">
-              <button onclick="window.youtubeDownloader.fetch()" class="px-4 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-lg transition" data-i18n="btn_fetch_youtube">Download Audio</button>
+              <input id="yt-url" type="text" class="flex-1 bg-dark-900 border border-dark-500 rounded-xl px-3 py-2 text-xs focus:border-accent focus:outline-none" placeholder="Paste YouTube URL here..." data-i18n="youtube_placeholder">
+              <button id="btn-fetch-yt" onclick="window.youtubeDownloader.fetch()" class="touch-btn min-h-[38px] px-3.5 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-xl shadow-md shadow-accent/20 flex items-center gap-1.5">
+                <span data-icon="download" data-icon-size="14"></span>
+                <span id="btn-fetch-yt-text" data-i18n="btn_fetch_youtube_mp3">Download MP3</span>
+              </button>
             </div>
             <div id="yt-status" class="text-xs text-accent hidden"></div>
             <!-- YouTube Progress Bar -->
             <div id="yt-progress-container" class="hidden mt-1">
               <div class="flex justify-between text-xs text-accent mb-1">
-                <span id="yt-status-text" data-i18n="youtube_loading">Downloading...</span>
+                <span id="yt-status-text">Downloading...</span>
                 <span id="yt-percent">0%</span>
               </div>
               <div class="w-full bg-dark-900 rounded-full h-2 border border-dark-500 overflow-hidden">
@@ -403,13 +635,14 @@
             <thead class="bg-dark-700 sticky top-0 z-10">
               <tr class="text-muted text-xs uppercase">
                 <th class="px-3 py-2 text-left" data-i18n="col_filename">Filename</th>
+                <th class="px-3 py-2 text-center w-28" data-i18n="tab_files_folder">Folder</th>
                 <th class="px-3 py-2 text-center w-20" data-i18n="col_size">Size</th>
                 <th class="px-3 py-2 text-center w-36" data-i18n="col_modified">Modified</th>
-                <th class="px-3 py-2 text-center w-44" data-i18n="col_actions">Actions</th>
+                <th class="px-3 py-2 text-center w-48" data-i18n="col_actions">Actions</th>
               </tr>
             </thead>
             <tbody id="files-body" class="divide-y divide-dark-500">
-              <tr><td colspan="4" class="px-3 py-8 text-center text-muted text-xs" data-i18n="no_files">No files uploaded yet</td></tr>
+              <tr><td colspan="5" class="px-3 py-8 text-center text-muted text-xs" data-i18n="no_files">No files uploaded yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -479,7 +712,10 @@
           </div>
 
           <div class="pt-4 flex justify-end">
-            <button type="submit" class="px-6 py-2.5 bg-accent hover:bg-accent-light text-white font-bold text-sm rounded-lg transition" data-i18n="btn_save_settings">Save Settings</button>
+            <button type="submit" class="touch-btn min-h-[44px] px-6 py-2.5 bg-accent hover:bg-accent-light text-white font-bold text-sm rounded-xl shadow-lg shadow-accent/30 flex items-center gap-2" data-i18n="btn_save_settings">
+              <span data-icon="check" data-icon-size="16"></span>
+              <span>Save Settings</span>
+            </button>
           </div>
         </form>
       </div>
@@ -494,28 +730,161 @@
   </div>
 
   <!-- ════════════════════════ MODAL ════════════════════════ -->
-  <div id="modal-overlay" class="hidden fixed inset-0 bg-black/60 modal-backdrop z-50 flex items-center justify-center">
+  <div id="modal-overlay" class="hidden fixed inset-0 bg-black/60 modal-backdrop z-50 flex items-center justify-center p-4">
     <div id="modal-content" class="bg-dark-800 border border-dark-500 rounded-2xl p-6 w-full max-w-lg shadow-2xl fade-in max-h-[85vh] overflow-y-auto">
       <!-- Filled dynamically by scheduler-ui.js -->
     </div>
   </div>
 
   <!-- Custom Exit Warning Modal -->
-  <div id="exit-warning-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 modal-backdrop">
+  <div id="exit-warning-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 modal-backdrop p-4">
     <div class="bg-dark-800 border border-red-500/50 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl text-center flex flex-col items-center gap-4 fade-in">
-      <div class="w-14 h-14 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-3xl font-bold">
-        ⚠️
+      <div class="w-14 h-14 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center shadow-lg shadow-red-500/20">
+        <span data-icon="warning" data-icon-size="32" class="text-red-400"></span>
       </div>
       <h3 class="text-lg font-bold text-white" data-i18n="modal_exit_title">แจ้งเตือนระบบประชาสัมพันธ์</h3>
       <p class="text-sm text-gray-300 leading-relaxed" data-i18n="confirm_close_page">
         โปรแกรมนี้จำเป็นต้องใช้ในห้องประชาสัมพันธ์ และต้องทำงานตลอดเวลา คุณยืนยันที่จะปิดหรือออกจากระบบหรือไม่?
       </p>
       <div class="flex justify-center gap-3 w-full mt-2">
-        <button id="btn-cancel-exit" class="flex-1 px-4 py-2.5 bg-dark-600 hover:bg-dark-500 text-white text-sm font-semibold rounded-xl transition border border-dark-500">
+        <button id="btn-cancel-exit" class="touch-btn min-h-[44px] flex-1 px-4 py-2.5 bg-dark-600 hover:bg-dark-500 text-white text-sm font-semibold rounded-xl transition border border-dark-500">
           <span data-i18n="btn_stay_on_page">ย้อนกลับ (ทำงานต่อ)</span>
         </button>
-        <button id="btn-confirm-exit" class="px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-red-600/30">
+        <button id="btn-confirm-exit" class="touch-btn min-h-[44px] px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-red-600/30">
           <span data-i18n="btn_confirm_exit">ยืนยันที่จะออก</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stream Diagnostics & Recovery Modal -->
+  <div id="stream-debug-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 modal-backdrop p-4">
+    <div class="bg-dark-800 border border-cyan-500/40 rounded-2xl p-6 max-w-xl w-full shadow-2xl flex flex-col gap-4 fade-in max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-dark-500 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span data-icon="wrench" data-icon-size="20" class="text-cyan-400"></span>
+          <h3 class="text-base font-bold text-white" data-i18n="stream_debug_title">Streaming Diagnostics & Recovery</h3>
+        </div>
+        <button onclick="window.streamController.closeDebugModal()" class="touch-btn w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:text-white hover:bg-dark-700 transition" title="Close">
+          <span data-icon="close" data-icon-size="20"></span>
+        </button>
+      </div>
+
+      <!-- Quick Metrics -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div class="bg-dark-900/80 p-3 rounded-xl border border-dark-500 flex flex-col">
+          <span class="text-[11px] text-muted uppercase tracking-wider">Room Status</span>
+          <span id="debug-room-status" class="text-sm font-bold text-gray-400 mt-1">Checking...</span>
+        </div>
+        <div class="bg-dark-900/80 p-3 rounded-xl border border-dark-500 flex flex-col">
+          <span class="text-[11px] text-muted uppercase tracking-wider" data-i18n="stream_debug_sockets">Connected Receivers</span>
+          <span id="debug-receiver-count" class="text-sm font-bold text-cyan-400 font-mono mt-1">0</span>
+        </div>
+        <div class="bg-dark-900/80 p-3 rounded-xl border border-dark-500 flex flex-col col-span-2 sm:col-span-1">
+          <span class="text-[11px] text-muted uppercase tracking-wider" data-i18n="stream_debug_uptime">Room Uptime</span>
+          <span id="debug-room-uptime" class="text-sm font-mono text-gray-300 mt-1">-</span>
+        </div>
+      </div>
+
+      <!-- Sockets Table -->
+      <div>
+        <div class="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Connected Sockets & Receivers</div>
+        <div class="max-h-48 overflow-y-auto rounded-lg border border-dark-500 bg-dark-900/60">
+          <table class="w-full text-xs">
+            <thead class="bg-dark-700/80 sticky top-0 text-muted">
+              <tr>
+                <th class="px-2.5 py-1.5 text-left">Role</th>
+                <th class="px-2.5 py-1.5 text-left">Remote IP</th>
+                <th class="px-2.5 py-1.5 text-center">Connected</th>
+                <th class="px-2.5 py-1.5 text-center">Last Heartbeat</th>
+              </tr>
+            </thead>
+            <tbody id="debug-sockets-body" class="divide-y divide-dark-500/50 text-gray-300">
+              <tr><td colspan="4" class="px-3 py-4 text-center text-muted">No sockets connected</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-wrap gap-2 pt-2 border-t border-dark-500">
+        <button id="btn-prune-sockets" onclick="window.streamController.triggerPrune()"
+          class="touch-btn min-h-[42px] flex-1 min-w-[140px] px-3 py-2 bg-dark-600 hover:bg-dark-500 text-yellow-300 border border-yellow-500/30 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5">
+          <span data-icon="trash" data-icon-size="16"></span>
+          <span data-i18n="btn_prune_sockets">Prune Sockets</span>
+        </button>
+        <button id="btn-reset-room" onclick="window.streamController.triggerReset()"
+          class="touch-btn min-h-[42px] flex-1 min-w-[140px] px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/40 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5">
+          <span data-icon="broadcast" data-icon-size="16"></span>
+          <span data-i18n="btn_force_reset_stream">Force Reset Room</span>
+        </button>
+        <button onclick="window.streamController.refreshDebugModal()"
+          class="touch-btn min-h-[42px] px-3.5 py-2 bg-dark-600 hover:bg-dark-500 text-gray-200 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5">
+          <span data-icon="refresh" data-icon-size="16"></span>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Folder Modal -->
+  <div id="create-folder-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 modal-backdrop p-4">
+    <div class="bg-dark-800 border border-dark-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl flex flex-col gap-4 fade-in">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <span data-icon="folder" data-icon-size="18" class="text-accent"></span>
+          <span data-i18n="folder_create_title">Create New Folder</span>
+        </h3>
+        <button onclick="window.fileManager.closeCreateFolderModal()" class="touch-btn w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-white hover:bg-dark-700 transition" title="Close">
+          <span data-icon="close" data-icon-size="18"></span>
+        </button>
+      </div>
+      <div>
+        <label class="block text-xs text-muted mb-1.5">Folder Name</label>
+        <input id="new-folder-name" type="text"
+          class="w-full bg-dark-900 border border-dark-500 rounded-xl px-3.5 py-2.5 text-sm text-gray-200 focus:border-accent focus:outline-none"
+          placeholder="e.g. Anthems, Morning PR" data-i18n="folder_create_placeholder"
+          onkeydown="if(event.key==='Enter') window.fileManager.submitCreateFolder()">
+      </div>
+      <div class="flex justify-end gap-2.5 pt-2">
+        <button onclick="window.fileManager.closeCreateFolderModal()"
+          class="touch-btn min-h-[40px] px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white text-xs font-semibold rounded-xl transition">
+          Cancel
+        </button>
+        <button onclick="window.fileManager.submitCreateFolder()"
+          class="touch-btn min-h-[40px] px-4 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-xl transition shadow-md shadow-accent/20">
+          Create
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Move File Modal -->
+  <div id="move-file-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/75 modal-backdrop p-4">
+    <div class="bg-dark-800 border border-dark-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl flex flex-col gap-4 fade-in">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <span data-icon="move" data-icon-size="18" class="text-accent"></span>
+          <span data-i18n="select_target_folder">Select Destination Folder</span>
+        </h3>
+        <button onclick="window.fileManager.closeMoveModal()" class="touch-btn w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-white hover:bg-dark-700 transition" title="Close">
+          <span data-icon="close" data-icon-size="18"></span>
+        </button>
+      </div>
+      <div>
+        <p id="move-file-name-label" class="text-xs text-muted mb-2 truncate">File: ...</p>
+        <select id="move-target-folder-select" class="w-full bg-dark-900 border border-dark-500 rounded-xl px-3.5 py-2.5 text-sm text-gray-200 focus:border-accent focus:outline-none">
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+      <div class="flex justify-end gap-2.5 pt-2">
+        <button onclick="window.fileManager.closeMoveModal()"
+          class="touch-btn min-h-[40px] px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white text-xs font-semibold rounded-xl transition">
+          Cancel
+        </button>
+        <button onclick="window.fileManager.submitMoveFile()"
+          class="touch-btn min-h-[40px] px-4 py-2 bg-accent hover:bg-accent-light text-white text-xs font-bold rounded-xl transition shadow-md shadow-accent/20">
+          Move File
         </button>
       </div>
     </div>

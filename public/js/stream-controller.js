@@ -16,8 +16,27 @@
   var reconnectTimer = null;
   var sessionToken = null;
 
+  // ── Session Token Resolution ─────────────────────────
+  function ensureSessionToken(cb) {
+    if (sessionToken) {
+      cb(sessionToken);
+      return;
+    }
+    fetch('/api/auth/check')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.token) {
+          sessionToken = d.token;
+        }
+        cb(sessionToken);
+      })
+      .catch(function () {
+        cb(null);
+      });
+  }
+
   // ── Enable/Disable Streaming ──────────────────────────
-  function enableStreaming() {
+  function enableStreaming(callback) {
     fetch('/api/streaming/enable', { method: 'POST' })
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -26,21 +45,22 @@
           isStreaming = true;
           receiverCount = data.receiverCount || 0;
 
-          // Get session token from cookie for WS auth
-          sessionToken = getSessionCookie();
+          ensureSessionToken(function () {
+            connectWs();
+            updateStreamingUI();
 
-          connectWs();
-          updateStreamingUI();
-
-          // Enable remote mode on audio engine
-          if (window.audioEngine && window.audioEngine.setRemoteMode) {
-            window.audioEngine.setRemoteMode(true);
-          }
+            // Enable remote mode on audio engine
+            if (window.audioEngine && window.audioEngine.setRemoteMode) {
+              window.audioEngine.setRemoteMode(true);
+            }
+            if (callback) callback(true);
+          });
         }
       })
       .catch(function (err) {
         console.error('[StreamController] Enable failed:', err);
         alert('Failed to enable streaming');
+        if (callback) callback(false);
       });
   }
 
@@ -145,7 +165,7 @@
         if (data.role === 'receiver') {
           receiverCount = data.count || (receiverCount + 1);
           updateStreamingUI();
-          setStatus('📡 Receiver connected (' + receiverCount + ')');
+          setStatus('Receiver connected (' + receiverCount + ')');
         }
         break;
 
@@ -153,7 +173,7 @@
         if (data.role === 'receiver') {
           receiverCount = data.count !== undefined ? data.count : Math.max(0, receiverCount - 1);
           updateStreamingUI();
-          setStatus('📡 Receiver disconnected (' + receiverCount + ' left)');
+          setStatus('Receiver disconnected (' + receiverCount + ' left)');
         }
         break;
 
@@ -222,6 +242,18 @@
       window.audioEngine.setRemoteState(state);
     }
 
+    // Sync track title and source in UI
+    if (state.track) {
+      var trackTitle = document.getElementById('track-title');
+      var trackSource = document.getElementById('track-source');
+      if (trackTitle && (trackTitle.textContent === 'No Track Loaded' || trackTitle.getAttribute('data-i18n') === 'no_track')) {
+        trackTitle.textContent = state.track.replace(/\.[^/.]+$/, '');
+      }
+      if (trackSource) {
+        trackSource.textContent = 'Streaming Room: ' + state.track;
+      }
+    }
+
     // Update progress bar
     if (state.duration > 0) {
       var seekBar = document.getElementById('seek-bar');
@@ -236,7 +268,9 @@
 
     // Update play button
     var btnPlay = document.getElementById('btn-play');
-    if (btnPlay) btnPlay.textContent = state.playing ? '⏸' : '▶';
+    if (btnPlay && window.Icons) {
+      btnPlay.innerHTML = window.Icons.get(state.playing ? 'pause' : 'play', { size: 28 });
+    }
 
     // Update volume display
     var volSlider = document.getElementById('vol-slider');
@@ -266,23 +300,24 @@
 
     if (!btn) return;
 
+    var streamIcon = window.Icons ? window.Icons.get('broadcast', { size: 14 }) : '';
     if (isStreaming) {
-      btn.className = 'px-3 py-1.5 bg-accent border border-accent rounded-lg text-xs font-bold text-white hover:bg-accent-light transition';
-      btn.innerHTML = '📡 ' + tr('streaming_disable');
+      btn.className = 'touch-btn min-h-[36px] px-3 py-1.5 bg-accent border border-accent rounded-xl text-xs font-bold text-white hover:bg-accent-light transition flex items-center gap-1.5 shadow-md shadow-accent/20';
+      btn.innerHTML = streamIcon + ' <span>' + tr('streaming_disable') + '</span>';
 
       if (badge) {
         badge.classList.remove('hidden');
         if (receiverCount > 0) {
-          badge.textContent = '🟢 ' + receiverCount + ' ' + tr('streaming_connected');
-          badge.className = 'text-xs text-green-400 font-bold';
+          badge.className = 'text-xs text-green-400 font-bold inline-flex items-center gap-1.5';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> ' + receiverCount + ' ' + tr('streaming_connected');
         } else {
-          badge.textContent = '🟡 ' + tr('streaming_waiting');
-          badge.className = 'text-xs text-yellow-400 font-bold pulse-waiting';
+          badge.className = 'text-xs text-yellow-400 font-bold pulse-waiting inline-flex items-center gap-1.5';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-yellow-400 animate-ping"></span> ' + tr('streaming_waiting');
         }
       }
     } else {
-      btn.className = 'px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent hover:text-accent transition';
-      btn.innerHTML = '📡 ' + tr('streaming_enable');
+      btn.className = 'touch-btn min-h-[36px] px-3 py-1.5 bg-dark-600 border border-dark-500 rounded-xl text-xs hover:border-accent hover:text-accent transition flex items-center gap-1.5';
+      btn.innerHTML = streamIcon + ' <span>' + tr('streaming_enable') + '</span>';
 
       if (badge) {
         badge.classList.add('hidden');
@@ -308,11 +343,129 @@
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
 
+  function getDebugInfo(callback) {
+    fetch('/api/streaming/debug')
+      .then(function (r) { return r.json(); })
+      .then(function (data) { if (callback) callback(data); })
+      .catch(function (err) { if (callback) callback({ error: err.message }); });
+  }
+
+  function resetRoom(callback) {
+    fetch('/api/streaming/reset', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        cleanup();
+        if (callback) callback(data);
+      })
+      .catch(function (err) {
+        cleanup();
+        if (callback) callback({ error: err.message });
+      });
+  }
+
+  function cleanDeadSockets(callback) {
+    fetch('/api/streaming/clean-dead', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.receiverCount !== undefined) {
+          receiverCount = data.receiverCount;
+          updateStreamingUI();
+        }
+        if (callback) callback(data);
+      })
+      .catch(function (err) {
+        if (callback) callback({ error: err.message });
+      });
+  }
+
+  function openDebugModal() {
+    var modal = document.getElementById('stream-debug-modal');
+    if (modal) modal.classList.remove('hidden');
+    refreshDebugModal();
+  }
+
+  function closeDebugModal() {
+    var modal = document.getElementById('stream-debug-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function refreshDebugModal() {
+    getDebugInfo(function (info) {
+      var statusEl = document.getElementById('debug-room-status');
+      var countEl = document.getElementById('debug-receiver-count');
+      var uptimeEl = document.getElementById('debug-room-uptime');
+      var tbody = document.getElementById('debug-sockets-body');
+
+      if (statusEl) {
+        if (info.active) {
+          statusEl.textContent = 'Active (' + (info.roomId || '') + ')';
+          statusEl.className = 'text-sm font-bold text-green-400 mt-1';
+        } else {
+          statusEl.textContent = 'Inactive';
+          statusEl.className = 'text-sm font-bold text-muted mt-1';
+        }
+      }
+
+      if (countEl) countEl.textContent = info.receiverCount || 0;
+      if (uptimeEl) {
+        var sec = info.uptimeSeconds || 0;
+        var m = (sec / 60) | 0;
+        var s = sec % 60;
+        uptimeEl.textContent = m + 'm ' + s + 's';
+      }
+
+      if (tbody) {
+        var rows = '';
+        if (info.controllerConnected) {
+          rows += '<tr class="bg-accent/10"><td class="px-2.5 py-1.5 font-semibold text-accent">Controller (Self)</td><td class="px-2.5 py-1.5">local</td><td class="px-2.5 py-1.5 text-center text-green-400">Connected</td><td class="px-2.5 py-1.5 text-center text-muted">Active</td></tr>';
+        }
+        if (info.receivers && info.receivers.length > 0) {
+          info.receivers.forEach(function (r) {
+            rows += '<tr>';
+            rows += '<td class="px-2.5 py-1.5 font-medium text-gray-200">Receiver #' + r.index + '</td>';
+            rows += '<td class="px-2.5 py-1.5 font-mono text-[11px] text-gray-300">' + (r.remoteAddress || 'connected') + '</td>';
+            rows += '<td class="px-2.5 py-1.5 text-center text-green-400">' + (r.readyState === 1 ? 'OPEN' : 'CLOSING') + '</td>';
+            rows += '<td class="px-2.5 py-1.5 text-center text-muted">OK</td>';
+            rows += '</tr>';
+          });
+        }
+        if (!info.controllerConnected && (!info.receivers || info.receivers.length === 0)) {
+          rows = '<tr><td colspan="4" class="px-3 py-4 text-center text-muted">No active sessions</td></tr>';
+        }
+        tbody.innerHTML = rows;
+      }
+    });
+  }
+
+  function triggerPrune() {
+    cleanDeadSockets(function (res) {
+      alert('Pruned dead sockets. Current receivers: ' + (res.receiverCount || 0));
+      refreshDebugModal();
+    });
+  }
+
+  function triggerReset() {
+    var promptMsg = window.appI18n ? window.appI18n.tr('stream_reset_confirm') : 'Are you sure you want to terminate all active sessions and reset the streaming room?';
+    if (!confirm(promptMsg)) return;
+    resetRoom(function () {
+      alert('Streaming room reset successfully.');
+      refreshDebugModal();
+    });
+  }
+
   // ── Public API ────────────────────────────────────────
   window.streamController = {
     toggle: toggleStreaming,
     enable: enableStreaming,
     disable: disableStreaming,
+    getDebugInfo: getDebugInfo,
+    resetRoom: resetRoom,
+    cleanDeadSockets: cleanDeadSockets,
+    openDebugModal: openDebugModal,
+    closeDebugModal: closeDebugModal,
+    refreshDebugModal: refreshDebugModal,
+    triggerPrune: triggerPrune,
+    triggerReset: triggerReset,
     sendPlay: sendPlay,
     sendPause: sendPause,
     sendStop: sendStop,

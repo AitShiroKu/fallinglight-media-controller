@@ -65,6 +65,7 @@
     // Re-render dynamic content
     if (window.playlist) window.playlist.render();
     if (window.schedulerUI) window.schedulerUI.render();
+    if (window.youtubeDownloader) window.youtubeDownloader.updateButtonText();
   }
 
   // Public API

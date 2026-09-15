@@ -13,7 +13,7 @@ import { settingsRoutes } from "./routes/settings";
 import { youtubeRoutes } from "./routes/youtube";
 import { streamingRoutes } from "./routes/streaming";
 import { initStorage, UPLOADS_DIR } from "./utils/storage";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const PORT = process.env.PORT ?? 6140;
 const PROJECT_ROOT = import.meta.dir.replace(/[/\\]src$/, "");
@@ -29,7 +29,7 @@ const app = new Elysia()
     prefix: "/",
   }))
 
-  // Serve uploaded media files from uploads/ with Unicode & Range support
+  // Serve uploaded media files from uploads/ with Unicode, nested folders & Range support
   .get("/uploads/*", async ({ params, set }) => {
     let decoded: string;
     try {
@@ -40,11 +40,15 @@ const app = new Elysia()
     }
 
     // Prevent directory traversal
-    if (decoded.includes("..") || decoded.includes("/") || decoded.includes("\\")) {
+    if (decoded.includes("..") || decoded.startsWith("/") || decoded.includes("\\")) {
       set.status = 400;
       return "Invalid filename";
     }
-    const filePath = join(UPLOADS_DIR, decoded);
+    const filePath = resolve(UPLOADS_DIR, decoded);
+    if (!filePath.startsWith(UPLOADS_DIR)) {
+      set.status = 403;
+      return "Forbidden";
+    }
     const file = Bun.file(filePath);
     if (await file.exists()) {
       const mimeTypes: Record<string, string> = {
@@ -72,8 +76,23 @@ const app = new Elysia()
     return "Not Found";
   })
 
-  // Serve streaming receiver page
+  // Serve streaming receiver pages:
+  // /stream       -> Both audio and video
+  // /stream/audio -> Audio only
+  // /stream/video -> Video only
   .get("/stream", async () => {
+    const html = Bun.file(join(PROJECT_ROOT, "public", "stream.html"));
+    return new Response(html, {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  })
+  .get("/stream/audio", async () => {
+    const html = Bun.file(join(PROJECT_ROOT, "public", "stream.html"));
+    return new Response(html, {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  })
+  .get("/stream/video", async () => {
     const html = Bun.file(join(PROJECT_ROOT, "public", "stream.html"));
     return new Response(html, {
       headers: { "content-type": "text/html; charset=utf-8" },
@@ -99,7 +118,7 @@ const app = new Elysia()
 
 console.log(`
 ╔══════════════════════════════════════════════════╗
-║   🎛  FallingLight Media Controller              ║
+║   [*] FallingLight Media Controller              ║
 ║   ───────────────────────────────────────────    ║
 ║   Server running at:                             ║
 ║     Local:   http://localhost:${PORT}               ║
@@ -109,5 +128,6 @@ console.log(`
 ╚══════════════════════════════════════════════════╝
 `);
 
+export { app };
 export type App = typeof app;
 // reload cache: 1

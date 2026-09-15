@@ -31,9 +31,8 @@ export async function isValidToken(token: unknown): Promise<boolean> {
   const parts = token.split(":");
   if (parts.length < 3) return false;
   const timestamp = parseInt(parts[1], 10);
-  if (isNaN(timestamp)) return false;
-  const age = Date.now() - timestamp;
-  if (age >= 24 * 60 * 60 * 1000) return false;
+  if (isNaN(timestamp) || timestamp <= 0) return false;
+  // Persistent login: no timeout / expiration check
   // Verify HMAC signature
   const payload = parts.slice(0, 2).join(":");
   const sigPart = parts.slice(2).join(":");

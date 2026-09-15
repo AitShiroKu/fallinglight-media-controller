@@ -14,12 +14,33 @@
 
   // ── Public API ────────────────────────────────────────
 
-  function addTrack(filename, loop) {
+  function isVideoPath(name) {
+    return /\.(mp4|webm|mkv|avi)$/i.test(name || '');
+  }
+
+  function addTrack(filename, loop, autoNext) {
     loop = loop !== undefined ? loop : 1;
+    autoNext = autoNext !== undefined ? autoNext : true;
     var title = filename.replace(/\.[^/.]+$/, '');
-    items.push({ filename: filename, title: title, loop: loop, currentLoop: 0, pinned: false });
+    var isVideo = isVideoPath(filename);
+    items.push({
+      filename: filename,
+      title: title,
+      loop: loop,
+      currentLoop: 0,
+      pinned: false,
+      autoNext: autoNext,
+      isVideo: isVideo
+    });
     if (currentIndex === -1) currentIndex = 0;
     render();
+  }
+
+  function toggleAutoNext(index) {
+    if (index >= 0 && index < items.length) {
+      items[index].autoNext = (items[index].autoNext === false) ? true : false;
+      render();
+    }
   }
 
   function removeTrack(index) {
@@ -130,7 +151,8 @@
       return;
     }
 
-    window.audioEngine.play('/uploads/' + encodeURIComponent(track.filename));
+    var encodedPath = (track.filename || '').split('/').map(encodeURIComponent).join('/');
+    window.audioEngine.play('/uploads/' + encodedPath);
     updateTrackInfo(track);
     render();
   }
@@ -190,6 +212,15 @@
         playIndex(currentIndex, true);
         return;
       }
+
+      // Check per-media autoNext setting! (เลือกว่าเมื่อจบสื่อนี้แล้วจะเล่นสื่ออื่นต่อไหม)
+      if (track.autoNext === false) {
+        track.currentLoop = 0;
+        window.audioEngine.stop();
+        setStatus(tr('status_track_ended_stopped') || 'เล่นสื่อจบแล้ว (หยุดตามที่ตั้งค่าไว้)');
+        render();
+        return;
+      }
     }
 
     // Advance to next
@@ -236,17 +267,27 @@
     var html = '<h3 class="text-lg font-bold text-accent mb-4">' + tr('dialog_add_files') + '</h3>';
     html += '<div class="space-y-1 max-h-60 overflow-y-auto mb-4">';
     files.forEach(function (f) {
+      var filePath = f.path || f.name;
+      var isVid = f.isVideo || /\.(mp4|webm|mkv|avi)$/i.test(filePath);
+      var icon = window.Icons ? window.Icons.get(isVid ? 'video' : 'music', { size: 16, className: isVid ? 'text-indigo-400' : 'text-accent' }) : '';
       html += '<label class="flex items-center gap-3 p-2 hover:bg-dark-600 rounded-lg cursor-pointer">';
-      html += '<input type="checkbox" value="' + escHtml(f.name) + '" class="file-pick-cb accent-accent">';
-      html += '<span class="flex-1 text-sm truncate">' + escHtml(f.name) + '</span>';
-      html += '<span class="text-xs text-muted">' + f.sizeFormatted + '</span>';
+      html += '<input type="checkbox" value="' + escHtml(filePath) + '" class="file-pick-cb accent-accent">';
+      html += '<span class="shrink-0 flex items-center">' + icon + '</span>';
+      html += '<span class="flex-1 text-sm truncate">' + escHtml(filePath) + '</span>';
+      html += '<span class="text-xs text-muted font-mono">' + f.sizeFormatted + '</span>';
       html += '</label>';
     });
     html += '</div>';
-    html += '<div class="flex items-center gap-3 mb-4">';
+    html += '<div class="flex items-center justify-between gap-3 mb-4 flex-wrap">';
+    html += '<div class="flex items-center gap-2">';
     html += '<label class="text-sm text-muted">' + tr('label_loop_count') + '</label>';
-    html += '<input type="number" id="pick-loop" min="0" max="999" value="1" class="w-20 bg-dark-900 border border-dark-500 rounded px-2 py-1 text-sm text-center">';
+    html += '<input type="number" id="pick-loop" min="0" max="999" value="1" class="w-16 bg-dark-900 border border-dark-500 rounded px-2 py-1 text-sm text-center">';
     html += '<span class="text-xs text-muted">(0 = ∞)</span>';
+    html += '</div>';
+    html += '<label class="flex items-center gap-2 cursor-pointer text-sm text-gray-300">';
+    html += '<input type="checkbox" id="pick-autonext" checked class="accent-accent">';
+    html += '<span>' + tr('label_autonext_default') + '</span>';
+    html += '</label>';
     html += '</div>';
     html += '<div class="flex justify-end gap-3">';
     html += '<button onclick="closeModal()" class="px-4 py-2 bg-dark-600 rounded-lg text-sm hover:bg-dark-500 transition">' + tr('btn_cancel') + '</button>';
@@ -260,13 +301,33 @@
   function _addPicked() {
     var cbs = document.querySelectorAll('.file-pick-cb:checked');
     var loopInput = document.getElementById('pick-loop');
+    var autoNextInput = document.getElementById('pick-autonext');
     var loop = loopInput ? parseInt(loopInput.value, 10) || 1 : 1;
+    var autoNext = autoNextInput ? autoNextInput.checked : true;
     if (loop < 0) loop = 0;
 
     cbs.forEach(function (cb) {
-      addTrack(cb.value, loop);
+      addTrack(cb.value, loop, autoNext);
     });
     closeModal();
+  }
+
+  function addFolderTracks(folderPath) {
+    fetch('/api/files?folder=' + encodeURIComponent(folderPath || ''))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.files && data.files.length > 0) {
+          data.files.forEach(function (f) {
+            addTrack(f.path || f.name, 1, true);
+          });
+          setStatus(tr('folder_added_to_playlist'));
+        } else {
+          alert(tr('no_files_in_folder'));
+        }
+      })
+      .catch(function () {
+        alert('Failed to load folder files');
+      });
   }
 
   // ── Render ────────────────────────────────────────────
@@ -275,7 +336,7 @@
     if (!tbody) return;
 
     if (items.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-muted text-xs">' + tr('playlist_empty') + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-8 text-center text-muted text-xs">' + tr('playlist_empty') + '</td></tr>';
       document.getElementById('playlist-info').textContent = '';
       return;
     }
@@ -284,24 +345,47 @@
     var isPlaying = window.audioEngine && window.audioEngine.isPlaying;
     items.forEach(function (track, i) {
       var playing = i === currentIndex ? ' playlist-row playing' : '';
-      html += '<tr class="playlist-row' + playing + ' cursor-pointer" ondblclick="window.playlist.playIndex(' + i + ')" draggable="true" data-idx="' + i + '">';
-      html += '<td class="px-3 py-2 text-muted text-xs">' + (i + 1) + '</td>';
-      html += '<td class="px-3 py-2 truncate max-w-[200px]">' + (i === currentIndex && isPlaying ? '▶ ' : '') + escHtml(track.title) + '</td>';
+      var mediaIcon = window.Icons ? window.Icons.get(track.isVideo ? 'video' : 'music', { size: 16, className: track.isVideo ? 'text-indigo-400' : 'text-accent' }) : '';
+      var playIcon = (i === currentIndex && isPlaying)
+        ? (window.Icons ? window.Icons.get('play', { size: 13, className: 'text-accent inline mr-1 animate-pulse' }) : '')
+        : '';
+      
+      html += '<tr class="playlist-row' + playing + ' cursor-pointer transition border-b border-dark-600/30" ondblclick="window.playlist.playIndex(' + i + ')" draggable="true" data-idx="' + i + '">';
+      html += '<td class="px-3 py-2 text-muted text-xs text-center font-mono">' + (i + 1) + '</td>';
+      html += '<td class="px-3 py-2 truncate max-w-[200px]">';
+      html += '<div class="flex items-center gap-2">';
+      html += '<span class="shrink-0 flex items-center justify-center">' + mediaIcon + '</span>';
+      html += '<span class="truncate font-medium ' + (i === currentIndex && isPlaying ? 'text-accent font-bold' : 'text-gray-200') + '">' + playIcon + escHtml(track.title) + '</span>';
+      html += '</div>';
+      html += '</td>';
       html += '<td class="px-3 py-2 text-center">';
-      html += '<input type="number" min="0" max="999" value="' + track.loop + '" class="w-12 bg-dark-900 border border-dark-500 rounded px-1 py-0.5 text-xs text-center" onchange="window.playlist.setLoop(' + i + ',parseInt(this.value)||0)">';
+      html += '<input type="number" min="0" max="999" value="' + track.loop + '" class="w-12 bg-dark-900 border border-dark-500 rounded-lg px-1.5 py-1 text-xs text-center" onchange="window.playlist.setLoop(' + i + ',parseInt(this.value)||0)">';
       html += '</td>';
       
       var left = track.loop === 0 ? '∞' : Math.max(0, track.loop - track.currentLoop);
-      html += '<td class="px-3 py-2 text-center text-xs text-accent">' + (i === currentIndex ? left : '-') + '</td>';
+      html += '<td class="px-3 py-2 text-center text-xs text-accent font-mono">' + (i === currentIndex ? left : '-') + '</td>';
+
+      // Auto-Next toggle column
+      html += '<td class="px-2 py-2 text-center">';
+      if (track.autoNext !== false) {
+        var nextIcon = window.Icons ? window.Icons.get('skip-forward', { size: 12, className: 'inline mr-1' }) : '';
+        html += '<button onclick="event.stopPropagation();window.playlist.toggleAutoNext(' + i + ')" class="touch-btn min-h-[30px] px-2.5 py-1 rounded-full text-[11px] font-semibold bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 transition shadow-sm inline-flex items-center" title="' + tr('tooltip_autonext_on') + '">' + nextIcon + tr('btn_autonext_on') + '</button>';
+      } else {
+        var stopIcon = window.Icons ? window.Icons.get('stop', { size: 12, className: 'inline mr-1' }) : '';
+        html += '<button onclick="event.stopPropagation();window.playlist.toggleAutoNext(' + i + ')" class="touch-btn min-h-[30px] px-2.5 py-1 rounded-full text-[11px] font-semibold bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/25 transition shadow-sm inline-flex items-center" title="' + tr('tooltip_autonext_off') + '">' + stopIcon + tr('btn_autonext_off') + '</button>';
+      }
+      html += '</td>';
 
       html += '<td class="px-3 py-2 text-center">';
-      html += '<div class="flex items-center justify-center gap-2">';
+      html += '<div class="flex items-center justify-center gap-1.5">';
+      var pinIcon = window.Icons ? window.Icons.get('pin', { size: 15, className: track.pinned ? 'text-yellow-400' : 'text-gray-400' }) : '';
       if (track.pinned) {
-        html += '<button onclick="event.stopPropagation();window.playlist.togglePin(' + i + ')" class="text-xs transition duration-150 hover:scale-125" title="Unpin track">📌</button>';
+        html += '<button onclick="event.stopPropagation();window.playlist.togglePin(' + i + ')" class="touch-btn w-8 h-8 rounded-lg flex items-center justify-center text-yellow-400 bg-yellow-400/10 transition" title="Unpin track">' + pinIcon + '</button>';
       } else {
-        html += '<button onclick="event.stopPropagation();window.playlist.togglePin(' + i + ')" class="opacity-30 hover:opacity-100 text-xs transition duration-150 hover:scale-125" title="Pin track">📌</button>';
+        html += '<button onclick="event.stopPropagation();window.playlist.togglePin(' + i + ')" class="touch-btn w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 opacity-40 hover:opacity-100 hover:bg-dark-600/50 transition" title="Pin track">' + pinIcon + '</button>';
       }
-      html += '<button onclick="event.stopPropagation();window.playlist.removeTrack(' + i + ')" class="text-accent hover:text-accent-light text-xs transition duration-150 hover:scale-125" title="Remove">❌</button>';
+      var trashIcon = window.Icons ? window.Icons.get('trash', { size: 15, className: 'text-accent' }) : '';
+      html += '<button onclick="event.stopPropagation();window.playlist.removeTrack(' + i + ')" class="touch-btn w-8 h-8 rounded-lg flex items-center justify-center text-accent hover:text-accent-light hover:bg-red-500/10 transition" title="Remove">' + trashIcon + '</button>';
       html += '</div>';
       html += '</td>';
       html += '</tr>';
@@ -348,11 +432,14 @@
     var src = document.getElementById('track-source');
     if (track) {
       if (el) el.textContent = track.title;
-      if (src) src.textContent = '📁 ' + track.filename;
-      setStatus('▶ ' + track.title);
+      if (src) {
+        var folderIcon = window.Icons ? window.Icons.get('folder', { size: 13, className: 'inline mr-1 text-muted' }) : '';
+        src.innerHTML = folderIcon + '<span>' + escHtml(track.filename) + '</span>';
+      }
+      setStatus(track.title);
     } else {
       if (el) el.textContent = tr('no_track');
-      if (src) src.textContent = '';
+      if (src) src.innerHTML = '';
     }
   }
 
@@ -385,7 +472,7 @@
           data.files.forEach(function (filename) {
             addTrack(filename, 1);
           });
-          setStatus('✅ Uploaded and added!');
+          setStatus('Uploaded and added!');
           if (window.fileManager) window.fileManager.load();
         } else {
           alert(data.error || 'Upload failed');
@@ -410,6 +497,8 @@
     addFromFiles: addFromFiles,
     _addPicked: _addPicked,
     uploadAndAdd: uploadAndAdd,
+    toggleAutoNext: toggleAutoNext,
+    addFolderTracks: addFolderTracks,
     setAutoAdvance: function (val) { configAutoAdvance = val; },
     render: render,
     togglePin: togglePin,

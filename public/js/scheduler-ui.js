@@ -51,9 +51,14 @@
       html += '<td class="px-3 py-2 text-center text-xs">' + (job.loop === 0 ? '∞' : (job.loop !== undefined ? job.loop : 1)) + '</td>';
       // Actions
       html += '<td class="px-3 py-2 text-center">';
-      html += '<button onclick="window.schedulerUI.openEdit(\'' + job.id + '\')" class="px-1 hover:text-accent" title="Edit">✏️</button>';
-      html += '<button onclick="window.schedulerUI.remove(\'' + job.id + '\')" class="px-1 hover:text-accent" title="Delete">🗑</button>';
-      html += '<button onclick="window.schedulerUI.testPlay(\'' + job.id + '\')" class="px-1 hover:text-accent" title="Test">▶</button>';
+      html += '<div class="flex items-center justify-center gap-1">';
+      var editIcon = window.Icons ? window.Icons.get('edit', { size: 14 }) : '';
+      var trashIcon = window.Icons ? window.Icons.get('trash', { size: 14, className: 'text-accent' }) : '';
+      var playIcon = window.Icons ? window.Icons.get('play', { size: 14, className: 'text-green-400' }) : '';
+      html += '<button onclick="window.schedulerUI.openEdit(\'' + job.id + '\')" class="touch-btn w-8 h-8 rounded-lg bg-dark-600/70 hover:bg-dark-500 text-gray-300 hover:text-white flex items-center justify-center transition" title="Edit">' + editIcon + '</button>';
+      html += '<button onclick="window.schedulerUI.remove(\'' + job.id + '\')" class="touch-btn w-8 h-8 rounded-lg bg-dark-600/70 hover:bg-red-500/20 text-accent flex items-center justify-center transition" title="Delete">' + trashIcon + '</button>';
+      html += '<button onclick="window.schedulerUI.testPlay(\'' + job.id + '\')" class="touch-btn w-8 h-8 rounded-lg bg-dark-600/70 hover:bg-green-500/20 text-green-400 flex items-center justify-center transition" title="Test">' + playIcon + '</button>';
+      html += '</div>';
       html += '</td>';
       html += '</tr>';
     });
@@ -146,26 +151,27 @@
           html += '<option value="' + escAttr(f.name) + '"' + (job && job.filename === f.name ? ' selected' : '') + '>' + escHtml(f.name) + ' (' + f.sizeFormatted + ')</option>';
         });
         html += '</select>';
-        html += '<label class="px-3 py-2 bg-dark-600 border border-dark-500 rounded-lg text-xs hover:border-accent transition cursor-pointer flex items-center justify-center whitespace-nowrap">';
-        html += '⬆️ ' + tr('btn_upload');
+        var uploadIcon = window.Icons ? window.Icons.get('upload', { size: 14 }) : '';
+        html += '<label class="touch-btn min-h-[40px] px-3.5 py-2 bg-dark-600 border border-dark-500 rounded-xl text-xs hover:border-accent transition cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap">';
+        html += uploadIcon + '<span>' + tr('btn_upload') + '</span>';
         html += '<input type="file" accept=".mp3,.mp4,.wav,.flac,.ogg,.m4a,.aac,.wma,.avi,.mkv,.webm" class="hidden" onchange="window.schedulerUI.uploadAndSelect(this.files, this.parentElement)">';
         html += '</label>';
         html += '</div></div>';
 
         // Volume
         html += '<div><label class="text-sm text-muted block mb-1">' + tr('label_volume') + '</label>';
-        html += '<input id="sched-vol" type="number" min="0" max="100" value="' + (job ? job.volume : 80) + '" class="w-20 bg-dark-900 border border-dark-500 rounded-lg px-3 py-2 text-sm text-center focus:border-accent focus:outline-none"> %</div>';
+        html += '<input id="sched-vol" type="number" min="0" max="100" value="' + (job ? job.volume : 80) + '" class="w-24 bg-dark-900 border border-dark-500 rounded-xl px-3 py-2 text-sm text-center focus:border-accent focus:outline-none"> %</div>';
 
         // Loop Count
         html += '<div><label class="text-sm text-muted block mb-1">' + tr('label_loop_count') + '</label>';
-        html += '<input id="sched-loop" type="number" min="0" max="999" value="' + (job ? (job.loop !== undefined ? job.loop : 1) : 1) + '" class="w-20 bg-dark-900 border border-dark-500 rounded-lg px-3 py-2 text-sm text-center focus:border-accent focus:outline-none"> <span class="text-xs text-muted">(0 = ∞)</span></div>';
+        html += '<input id="sched-loop" type="number" min="0" max="999" value="' + (job ? (job.loop !== undefined ? job.loop : 1) : 1) + '" class="w-24 bg-dark-900 border border-dark-500 rounded-xl px-3 py-2 text-sm text-center focus:border-accent focus:outline-none"> <span class="text-xs text-muted">(0 = ∞)</span></div>';
 
         html += '</div>';
 
         // Buttons
         html += '<div class="flex justify-end gap-3 mt-6">';
-        html += '<button onclick="closeModal()" class="px-4 py-2 bg-dark-600 rounded-lg text-sm hover:bg-dark-500 transition">' + tr('btn_cancel') + '</button>';
-        html += '<button onclick="window.schedulerUI._saveModal(\'' + (job ? job.id : '') + '\')" class="px-4 py-2 bg-accent text-white rounded-lg text-sm font-bold hover:bg-accent-light transition">' + tr('btn_save') + '</button>';
+        html += '<button onclick="closeModal()" class="touch-btn min-h-[42px] px-4 py-2 bg-dark-600 rounded-xl text-sm hover:bg-dark-500 transition">' + tr('btn_cancel') + '</button>';
+        html += '<button onclick="window.schedulerUI._saveModal(\'' + (job ? job.id : '') + '\')" class="touch-btn min-h-[42px] px-5 py-2 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-light transition shadow-md shadow-accent/20">' + tr('btn_save') + '</button>';
         html += '</div>';
 
         content.innerHTML = html;
@@ -274,7 +280,7 @@
     formData.append('file', file);
     
     var oldHTML = labelEl.innerHTML;
-    labelEl.innerHTML = '⏳...';
+    labelEl.innerHTML = (window.Icons ? window.Icons.get('clock', { size: 14, className: 'animate-spin inline mr-1' }) : '') + '<span>Uploading...</span>';
     
     fetch('/api/files/upload', { method: 'POST', body: formData })
       .then(function(r) { return r.json(); })
@@ -340,7 +346,7 @@
         window.audioEngine.setVolume(job.volume / 100);
         window.playlist.addTrack(job.filename, job.loop !== undefined ? job.loop : 1);
         window.playlist.playIndex(window.playlist.items.length - 1);
-        setStatus('📅 ' + tr('status_scheduled') + ': ' + job.name);
+        setStatus(tr('status_scheduled') + ': ' + job.name);
       }
     });
   }

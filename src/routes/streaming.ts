@@ -23,6 +23,19 @@ function generateRoomId(): string {
 }
 
 // ── WebSocket helpers ────────────────────────────────────────
+function pruneDeadSockets() {
+  if (!activeRoom) return;
+  for (const receiver of Array.from(activeRoom.receivers)) {
+    if (!receiver || receiver.readyState !== 1) {
+      try { receiver.close(); } catch {}
+      activeRoom.receivers.delete(receiver);
+    }
+  }
+  if (activeRoom.controllerWs && activeRoom.controllerWs.readyState !== 1) {
+    activeRoom.controllerWs = null;
+  }
+}
+
 function sendTo(ws: any, data: object) {
   try {
     if (ws && ws.readyState === 1) {
@@ -35,6 +48,7 @@ function sendTo(ws: any, data: object) {
 
 function broadcastToReceivers(data: object) {
   if (!activeRoom) return;
+  pruneDeadSockets();
   for (const receiver of activeRoom.receivers) {
     sendTo(receiver, data);
   }
@@ -42,7 +56,11 @@ function broadcastToReceivers(data: object) {
 
 function relayToController(data: object) {
   if (activeRoom?.controllerWs) {
-    sendTo(activeRoom.controllerWs, data);
+    if (activeRoom.controllerWs.readyState === 1) {
+      sendTo(activeRoom.controllerWs, data);
+    } else {
+      activeRoom.controllerWs = null;
+    }
   }
 }
 
@@ -51,13 +69,14 @@ const streamingPublicApi = new Elysia({ prefix: "/api/streaming" })
 
   // GET /api/streaming/status — Check streaming state (public)
   .get("/status", () => {
+    pruneDeadSockets();
     if (!activeRoom) {
       return { active: false };
     }
     return {
       active: true,
       roomId: activeRoom.id,
-      controllerConnected: !!activeRoom.controllerWs,
+      controllerConnected: !!(activeRoom.controllerWs && activeRoom.controllerWs.readyState === 1),
       receiverCount: activeRoom.receivers.size,
     };
   });
@@ -69,6 +88,7 @@ const streamingApi = requireAuth(
 
   // POST /api/streaming/enable — Create or get streaming room
   .post("/enable", () => {
+    pruneDeadSockets();
     if (!activeRoom) {
       activeRoom = {
         id: generateRoomId(),
@@ -87,12 +107,10 @@ const streamingApi = requireAuth(
   // POST /api/streaming/disable — Tear down streaming room
   .post("/disable", () => {
     if (activeRoom) {
-      // Notify all receivers
       for (const receiver of activeRoom.receivers) {
         sendTo(receiver, { type: "room_closed" });
         try { receiver.close(); } catch {}
       }
-      // Notify controller
       if (activeRoom.controllerWs) {
         sendTo(activeRoom.controllerWs, { type: "room_closed" });
         try { activeRoom.controllerWs.close(); } catch {}
@@ -100,6 +118,62 @@ const streamingApi = requireAuth(
       activeRoom = null;
     }
     return { success: true };
+  })
+
+  // GET /api/streaming/debug — Detailed diagnostics for active room and connections
+  .get("/debug", () => {
+    pruneDeadSockets();
+    if (!activeRoom) {
+      return {
+        active: false,
+        roomId: null,
+        controllerConnected: false,
+        receiverCount: 0,
+        receivers: [],
+        uptimeSeconds: 0,
+        serverTime: new Date().toISOString(),
+      };
+    }
+    return {
+      active: true,
+      roomId: activeRoom.id,
+      createdAt: activeRoom.createdAt,
+      uptimeSeconds: Math.floor((Date.now() - activeRoom.createdAt) / 1000),
+      controllerConnected: !!(activeRoom.controllerWs && activeRoom.controllerWs.readyState === 1),
+      receiverCount: activeRoom.receivers.size,
+      receivers: Array.from(activeRoom.receivers).map((r: any, idx: number) => ({
+        index: idx + 1,
+        readyState: r.readyState,
+        remoteAddress: r.remoteAddress || "connected",
+      })),
+      serverTime: new Date().toISOString(),
+    };
+  })
+
+  // POST /api/streaming/reset — Forcefully reset room, terminate zombie sockets, clear state
+  .post("/reset", () => {
+    if (activeRoom) {
+      for (const receiver of activeRoom.receivers) {
+        sendTo(receiver, { type: "room_closed", reason: "reset_requested" });
+        try { receiver.close(); } catch {}
+      }
+      if (activeRoom.controllerWs) {
+        sendTo(activeRoom.controllerWs, { type: "room_closed", reason: "reset_requested" });
+        try { activeRoom.controllerWs.close(); } catch {}
+      }
+      activeRoom = null;
+    }
+    return { success: true, message: "Streaming room and all sessions cleared successfully." };
+  })
+
+  // POST /api/streaming/clean-dead — Prune zombie sockets
+  .post("/clean-dead", () => {
+    pruneDeadSockets();
+    return {
+      success: true,
+      receiverCount: activeRoom ? activeRoom.receivers.size : 0,
+      controllerConnected: !!(activeRoom?.controllerWs && activeRoom.controllerWs.readyState === 1),
+    };
   })
 );
 
@@ -124,7 +198,15 @@ const streamingWs = new Elysia()
 
       // Controller must have valid auth token (query param or secure cookie)
       if (role === "controller") {
-        const authToken = token || ws.data.cookie?.session?.value;
+        let authToken = token || ws.data.cookie?.session?.value;
+        if (!authToken && (ws.data as any)?.headers) {
+          const rawCookie = (ws.data as any).headers?.cookie || (ws.data as any).headers?.get?.("cookie");
+          if (rawCookie && typeof rawCookie === "string") {
+            const m = rawCookie.match(/(?:^|;\s*)session=([^;]+)/);
+            if (m) authToken = decodeURIComponent(m[1]);
+          }
+        }
+
         if (!(await isValidToken(authToken))) {
           sendTo(ws, { type: "error", message: "Unauthorized" });
           ws.close();
@@ -139,6 +221,9 @@ const streamingWs = new Elysia()
 
         activeRoom.controllerWs = ws;
         sendTo(ws, { type: "connected", role: "controller" });
+
+        // Prune any dead receivers before notifying
+        pruneDeadSockets();
 
         // Notify all existing receivers
         for (const receiver of activeRoom.receivers) {
@@ -155,7 +240,7 @@ const streamingWs = new Elysia()
         sendTo(ws, { type: "connected", role: "receiver" });
 
         // Notify controller about new receiver
-        if (activeRoom.controllerWs) {
+        if (activeRoom.controllerWs && activeRoom.controllerWs.readyState === 1) {
           sendTo(activeRoom.controllerWs, {
             type: "peer_connected",
             role: "receiver",
@@ -176,6 +261,11 @@ const streamingWs = new Elysia()
       try {
         data = typeof message === "string" ? JSON.parse(message) : message;
       } catch {
+        return;
+      }
+
+      if (data.type === "ping") {
+        sendTo(ws, { type: "pong", time: Date.now() });
         return;
       }
 

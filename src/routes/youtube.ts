@@ -1,12 +1,12 @@
 /**
- * YouTube Routes — Fetch/download audio from YouTube URLs.
+ * YouTube Routes — Fetch/download audio or video from YouTube URLs.
  */
 import { Elysia, t } from "elysia";
 import { authGuard, requireAuth } from "../middleware/auth-guard";
 import { UPLOADS_DIR, sanitizeFilename, loadSettings } from "../utils/storage";
 import { join } from "node:path";
 
-const ytJobs = new Map<string, { status: "downloading" | "success" | "error"; progress: number; filename?: string; error?: string }>();
+const ytJobs = new Map<string, { status: "downloading" | "success" | "error"; progress: number; filename?: string; error?: string; format?: "mp3" | "mp4" }>();
 
 export const youtubeRoutes = requireAuth(
   new Elysia({ prefix: "/api/youtube" }).use(authGuard),
@@ -22,9 +22,11 @@ export const youtubeRoutes = requireAuth(
     return job;
   })
 
-  // POST /api/youtube/download — Start YouTube audio download
+  // POST /api/youtube/download — Start YouTube download (MP3 audio or MP4 video+audio)
   .post("/download", async ({ body, set }) => {
-    const { url } = body;
+    const { url, format } = body;
+    const isMp4 = format === "mp4";
+    const targetExt = isMp4 ? "mp4" : "mp3";
 
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       set.status = 400;
@@ -33,7 +35,7 @@ export const youtubeRoutes = requireAuth(
 
     try {
       const jobId = crypto.randomUUID();
-      ytJobs.set(jobId, { status: "downloading", progress: 0 });
+      ytJobs.set(jobId, { status: "downloading", progress: 0, format: isMp4 ? "mp4" : "mp3" });
 
       // Start the entire process in background so API returns immediately
       (async () => {
@@ -41,35 +43,52 @@ export const youtubeRoutes = requireAuth(
           // 1. Get video title with remote-components enabled for JS challenges
           const titleProc = Bun.spawn(["yt-dlp", "--remote-components", "ejs:github", "--print", "%(title)s", url]);
           const titleExitCode = await titleProc.exited;
-          let title = "youtube_audio";
+          let title = "youtube_media";
           if (titleExitCode === 0) {
             const fetchedTitle = (await new Response(titleProc.stdout).text()).trim();
             if (fetchedTitle) title = fetchedTitle;
           }
 
-          const safeTitle = sanitizeFilename(title) || "youtube_audio";
-          const outputFilename = `${safeTitle}.mp3`;
+          const safeTitle = sanitizeFilename(title) || "youtube_media";
+          const outputFilename = `${safeTitle}.${targetExt}`;
           const outputPath = join(UPLOADS_DIR, `${safeTitle}.%(ext)s`);
 
           // 2. Load YouTube quality setting
           const settings = await loadSettings();
           const quality = settings.ytQuality ?? "0";
 
-          // 3. Start download
-          const downloadProc = Bun.spawn([
+          // 3. Build yt-dlp arguments conditionally based on format
+          const dlArgs = [
             "yt-dlp",
             "--remote-components",
             "ejs:github",
             "--newline",
-            "-x",
-            "--audio-format",
-            "mp3",
-            "--audio-quality",
-            quality,
-            "-o",
-            outputPath,
-            url,
-          ], { stdout: "pipe", stderr: "pipe" });
+          ];
+
+          if (isMp4) {
+            dlArgs.push(
+              "-f",
+              "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
+              "--merge-output-format",
+              "mp4",
+              "-o",
+              outputPath,
+              url
+            );
+          } else {
+            dlArgs.push(
+              "-x",
+              "--audio-format",
+              "mp3",
+              "--audio-quality",
+              quality,
+              "-o",
+              outputPath,
+              url
+            );
+          }
+
+          const downloadProc = Bun.spawn(dlArgs, { stdout: "pipe", stderr: "pipe" });
 
           // Concurrently read stderr to prevent pipe buffer deadlock
           const stderrPromise = new Response(downloadProc.stderr).text();
@@ -91,7 +110,7 @@ export const youtubeRoutes = requireAuth(
               if (match) {
                 const prog = parseFloat(match[1]);
                 if (!isNaN(prog)) {
-                  ytJobs.set(jobId, { status: "downloading", progress: prog });
+                  ytJobs.set(jobId, { status: "downloading", progress: prog, format: isMp4 ? "mp4" : "mp3" });
                 }
               }
             }
@@ -102,7 +121,7 @@ export const youtubeRoutes = requireAuth(
             if (match) {
               const prog = parseFloat(match[1]);
               if (!isNaN(prog)) {
-                ytJobs.set(jobId, { status: "downloading", progress: prog });
+                ytJobs.set(jobId, { status: "downloading", progress: prog, format: isMp4 ? "mp4" : "mp3" });
               }
             }
           }
@@ -113,13 +132,13 @@ export const youtubeRoutes = requireAuth(
 
           // yt-dlp might return non-zero exit code on warning but still create the file successfully
           if (exitCode === 0 || fileExists) {
-            ytJobs.set(jobId, { status: "success", progress: 100, filename: outputFilename });
+            ytJobs.set(jobId, { status: "success", progress: 100, filename: outputFilename, format: isMp4 ? "mp4" : "mp3" });
           } else {
             const errorText = await stderrPromise;
-            ytJobs.set(jobId, { status: "error", progress: 0, error: `Download failed: ${errorText.trim()}` });
+            ytJobs.set(jobId, { status: "error", progress: 0, error: `Download failed: ${errorText.trim()}`, format: isMp4 ? "mp4" : "mp3" });
           }
         } catch (err: any) {
-          ytJobs.set(jobId, { status: "error", progress: 0, error: err.message });
+          ytJobs.set(jobId, { status: "error", progress: 0, error: err.message, format: isMp4 ? "mp4" : "mp3" });
         } finally {
           // Clean up job from memory after 30 minutes
           setTimeout(() => {
@@ -136,6 +155,7 @@ export const youtubeRoutes = requireAuth(
   }, {
     body: t.Object({
       url: t.String(),
+      format: t.Optional(t.Union([t.Literal("mp3"), t.Literal("mp4")])),
     }),
   })
 );

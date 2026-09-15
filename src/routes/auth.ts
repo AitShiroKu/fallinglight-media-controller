@@ -47,12 +47,12 @@ export const authRoutes = new Elysia({ prefix: "/api/auth" })
       cookie.session.set({
         value: token,
         httpOnly: true,
-        maxAge: 24 * 60 * 60, // 24 hours
+        maxAge: 10 * 365 * 24 * 60 * 60, // 10 years (persistent login)
         path: "/",
         sameSite: "lax",
       });
 
-      return { success: true, message: "Login successful" };
+      return { success: true, message: "Login successful", token };
     }
 
     set.status = 401;
@@ -72,6 +72,9 @@ export const authRoutes = new Elysia({ prefix: "/api/auth" })
 
   // GET /api/auth/check
   .use(authGuard)
-  .get("/check", ({ isAuthenticated }) => {
-    return { authenticated: isAuthenticated };
+  .get("/check", ({ isAuthenticated, cookie }) => {
+    return {
+      authenticated: isAuthenticated,
+      token: isAuthenticated ? (cookie?.session?.value ?? null) : null,
+    };
   });

@@ -8,7 +8,53 @@
 (function () {
   'use strict';
 
-  // ── Audio Engine (self-contained for receiver) ────────
+  // ── Mode Detection (/stream, /stream/audio, /stream/video) ──
+  var path = window.location.pathname.toLowerCase();
+  var urlParams = new URLSearchParams(window.location.search);
+  var streamMode = urlParams.get('mode') || (path.endsWith('/audio') ? 'audio' : path.endsWith('/video') ? 'video' : 'both');
+
+  // Highlight active mode pill in header
+  function initModeUI() {
+    var pillBoth = document.getElementById('mode-pill-both');
+    var pillAudio = document.getElementById('mode-pill-audio');
+    var pillVideo = document.getElementById('mode-pill-video');
+    var modeLabel = document.getElementById('video-mode-label');
+    var headerIcon = document.getElementById('header-mode-icon');
+
+    [pillBoth, pillAudio, pillVideo].forEach(function (p) {
+      if (p) p.classList.remove('border-accent', 'text-accent', 'bg-accent/20');
+    });
+
+    if (streamMode === 'audio') {
+      if (pillAudio) pillAudio.classList.add('border-accent', 'text-accent', 'bg-accent/20');
+      if (modeLabel) modeLabel.textContent = 'AUDIO STREAM ONLY';
+      if (headerIcon) {
+        if (window.Icons) headerIcon.innerHTML = window.Icons.get('music', { size: 32, className: 'text-accent' });
+        else headerIcon.textContent = 'Audio';
+      }
+    } else if (streamMode === 'video') {
+      if (pillVideo) pillVideo.classList.add('border-accent', 'text-accent', 'bg-accent/20');
+      if (modeLabel) modeLabel.textContent = 'VIDEO STREAM ONLY';
+      if (headerIcon) {
+        if (window.Icons) headerIcon.innerHTML = window.Icons.get('video', { size: 32, className: 'text-accent' });
+        else headerIcon.textContent = 'Video';
+      }
+    } else {
+      if (pillBoth) pillBoth.classList.add('border-accent', 'text-accent', 'bg-accent/20');
+      if (modeLabel) modeLabel.textContent = 'LIVE STREAM (ALL)';
+      if (headerIcon) {
+        if (window.Icons) headerIcon.innerHTML = window.Icons.get('broadcast', { size: 32, className: 'text-accent' });
+        else headerIcon.textContent = 'Live';
+      }
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initModeUI);
+  } else {
+    initModeUI();
+  }
+
+  // ── Audio/Video Elements (self-contained for receiver) ──
   var audioEl = new Audio();
   audioEl.crossOrigin = 'anonymous';
   audioEl.preload = 'auto';
@@ -22,12 +68,46 @@
     });
   }
 
+  var videoEl = null;
+  var videoContainer = null;
+  function initVideoEl() {
+    videoEl = document.getElementById('receiver-video');
+    videoContainer = document.getElementById('video-container');
+    if (videoEl) {
+      videoEl.crossOrigin = 'anonymous';
+      videoEl.preload = 'auto';
+      videoEl.addEventListener('timeupdate', updateProgress);
+      videoEl.addEventListener('loadedmetadata', function () {
+        var timeTotal = document.getElementById('stream-time-total');
+        if (timeTotal && isFinite(videoEl.duration)) timeTotal.textContent = formatTime(videoEl.duration);
+      });
+      videoEl.addEventListener('play', updatePlayState);
+      videoEl.addEventListener('pause', updatePlayState);
+      videoEl.addEventListener('ended', onMediaEnded);
+    }
+    var btnFs = document.getElementById('btn-fullscreen');
+    if (btnFs) {
+      btnFs.addEventListener('click', function () {
+        if (!document.fullscreenElement) {
+          (videoContainer || videoEl).requestFullscreen().catch(function () {});
+        } else {
+          document.exitFullscreen().catch(function () {});
+        }
+      });
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initVideoEl);
+  } else {
+    initVideoEl();
+  }
+
   var audioCtx = null;
   var analyserL = null;
   var analyserR = null;
   var sourceNode = null;
   var splitter = null;
-  var isCtxConnected = false;
+  var connectedElement = null;
 
   var currentVolume = 0.8;
   var isDucked = false;
@@ -35,6 +115,7 @@
   var currentTrack = null;
   var currentLoop = 0;
   var maxLoop = 1;
+  var isCurrentMediaVideo = false;
 
   var dataL = null;
   var dataR = null;
@@ -46,6 +127,14 @@
   var roomId = null;
   var isConnected = false;
   var controllerConnected = false;
+
+  function isVideoPath(name) {
+    return /\.(mp4|webm|mkv|avi)$/i.test(name || '');
+  }
+
+  function getActiveMedia() {
+    return (isCurrentMediaVideo && streamMode !== 'audio' && videoEl) ? videoEl : audioEl;
+  }
 
   // ── Audio Context Setup ───────────────────────────────
   function ensureContext() {
@@ -60,22 +149,22 @@
     dataR = new Uint8Array(analyserR.frequencyBinCount);
   }
 
-  function connectSource() {
-    if (isCtxConnected) return;
+  function connectSource(targetEl) {
+    if (!targetEl || connectedElement === targetEl) return;
     ensureContext();
     try {
-      sourceNode = audioCtx.createMediaElementSource(audioEl);
+      sourceNode = audioCtx.createMediaElementSource(targetEl);
       sourceNode.connect(splitter);
       splitter.connect(analyserL, 0);
       splitter.connect(analyserR, 1);
       sourceNode.connect(audioCtx.destination);
-      isCtxConnected = true;
+      connectedElement = targetEl;
     } catch (e) {
-      isCtxConnected = true;
+      connectedElement = targetEl;
     }
   }
 
-  // ── Audio Playback ────────────────────────────────────
+  // ── Playback ──────────────────────────────────────────
   function play(url, filename, loop) {
     ensureContext();
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -83,45 +172,111 @@
     currentTrack = filename || url;
     maxLoop = (loop !== undefined && loop !== null) ? loop : 1;
     currentLoop = 0;
+    isCurrentMediaVideo = isVideoPath(currentTrack);
 
-    audioEl.src = url;
-    audioEl.volume = isDucked ? Math.max(0, currentVolume * 0.15) : currentVolume;
-    var p = audioEl.play();
-    if (p) p.catch(function () {});
-    connectSource();
-    startVU();
+    var mediaIcon = document.getElementById('stream-media-icon');
+    if (mediaIcon && window.Icons) {
+      mediaIcon.innerHTML = window.Icons.get(isCurrentMediaVideo ? 'video' : 'music', { size: 24, className: isCurrentMediaVideo ? 'text-indigo-400' : 'text-accent' });
+    }
+
+    if (isCurrentMediaVideo) {
+      if (streamMode === 'audio') {
+        // Audio-only mode: hide video, play audio
+        if (videoContainer) videoContainer.classList.add('hidden');
+        if (videoEl) { videoEl.pause(); videoEl.src = ''; }
+
+        audioEl.src = url;
+        audioEl.muted = false;
+        audioEl.volume = isDucked ? Math.max(0, currentVolume * 0.15) : currentVolume;
+        var pa = audioEl.play();
+        if (pa) pa.catch(function () {});
+        connectSource(audioEl);
+        startVU();
+
+      } else if (streamMode === 'video') {
+        // Video-only mode: show video, mute audio
+        if (audioEl) { audioEl.pause(); audioEl.src = ''; }
+        if (videoContainer) videoContainer.classList.remove('hidden');
+
+        if (videoEl) {
+          videoEl.src = url;
+          videoEl.muted = true;
+          videoEl.volume = 0;
+          var pv = videoEl.play();
+          if (pv) pv.catch(function () {});
+        }
+        stopVU();
+
+      } else {
+        // Default: Both Video and Audio
+        if (audioEl) { audioEl.pause(); audioEl.src = ''; }
+        if (videoContainer) videoContainer.classList.remove('hidden');
+
+        if (videoEl) {
+          videoEl.src = url;
+          videoEl.muted = false;
+          videoEl.volume = isDucked ? Math.max(0, currentVolume * 0.15) : currentVolume;
+          var pb = videoEl.play();
+          if (pb) pb.catch(function () {});
+          connectSource(videoEl);
+        }
+        startVU();
+      }
+    } else {
+      // Audio-only track
+      if (videoContainer) videoContainer.classList.add('hidden');
+      if (videoEl) { videoEl.pause(); videoEl.src = ''; }
+
+      audioEl.src = url;
+      if (streamMode === 'video') {
+        audioEl.muted = true;
+        stopVU();
+      } else {
+        audioEl.muted = false;
+        audioEl.volume = isDucked ? Math.max(0, currentVolume * 0.15) : currentVolume;
+        connectSource(audioEl);
+        startVU();
+      }
+      var p = audioEl.play();
+      if (p) p.catch(function () {});
+    }
+
     updateNowPlaying();
   }
 
   function pauseToggle() {
-    if (audioEl.paused) {
-      audioEl.play().catch(function () {});
-      startVU();
+    var media = getActiveMedia();
+    if (!media) return;
+
+    if (media.paused) {
+      media.play().catch(function () {});
+      if (streamMode !== 'video') startVU();
     } else {
-      audioEl.pause();
+      media.pause();
       stopVU();
     }
     updatePlayState();
   }
 
   function stop() {
-    audioEl.pause();
-    audioEl.currentTime = 0;
+    if (audioEl) { audioEl.pause(); audioEl.currentTime = 0; }
+    if (videoEl) { videoEl.pause(); videoEl.currentTime = 0; }
     stopVU();
     updatePlayState();
   }
 
   function setVolume(v) {
     currentVolume = Math.max(0, Math.min(1, v));
-    if (!isDucked) {
-      audioEl.volume = currentVolume;
-    }
+    var vol = isDucked ? Math.max(0, currentVolume * 0.15) : currentVolume;
+    if (audioEl && streamMode !== 'video') audioEl.volume = vol;
+    if (videoEl && streamMode === 'both') videoEl.volume = vol;
     updateVolumeUI();
   }
 
   function seekTo(ratio) {
-    if (audioEl.duration && isFinite(audioEl.duration)) {
-      audioEl.currentTime = ratio * audioEl.duration;
+    var media = getActiveMedia();
+    if (media && media.duration && isFinite(media.duration)) {
+      media.currentTime = ratio * media.duration;
     }
   }
 
@@ -129,36 +284,44 @@
     var duckEl = document.getElementById('duck-indicator');
     if (active && !isDucked) {
       isDucked = true;
-      preDuckVolume = audioEl.volume;
-      audioEl.volume = Math.max(0, currentVolume * 0.15);
+      preDuckVolume = currentVolume;
+      var duckVol = Math.max(0, currentVolume * 0.15);
+      if (audioEl && streamMode !== 'video') audioEl.volume = duckVol;
+      if (videoEl && streamMode === 'both') videoEl.volume = duckVol;
       if (duckEl) duckEl.classList.remove('hidden');
     } else if (!active && isDucked) {
       isDucked = false;
-      audioEl.volume = currentVolume;
+      if (audioEl && streamMode !== 'video') audioEl.volume = currentVolume;
+      if (videoEl && streamMode === 'both') videoEl.volume = currentVolume;
       if (duckEl) duckEl.classList.add('hidden');
     }
   }
 
-  // ── Track ended → loop or notify ─────────────────────
-  audioEl.addEventListener('ended', function () {
+  function onMediaEnded() {
     currentLoop++;
+    var media = getActiveMedia();
     if (maxLoop === 0) {
       // Infinite loop
-      audioEl.currentTime = 0;
-      audioEl.play().catch(function () {});
+      if (media) {
+        media.currentTime = 0;
+        media.play().catch(function () {});
+      }
     } else if (currentLoop < maxLoop) {
-      audioEl.currentTime = 0;
-      audioEl.play().catch(function () {});
+      if (media) {
+        media.currentTime = 0;
+        media.play().catch(function () {});
+      }
     } else {
       // Track finished all loops
       stopVU();
       updatePlayState();
       sendState();
-      // Notify controller that track ended
       wsSend({ type: 'track_ended' });
     }
     updateNowPlaying();
-  });
+  }
+
+  audioEl.addEventListener('ended', onMediaEnded);
 
   // ── VU Meter ──────────────────────────────────────────
   function sendVu(l, r) {
@@ -229,7 +392,10 @@
     if (currentTrack) {
       var displayName = currentTrack.replace(/\.[^/.]+$/, '');
       if (titleEl) titleEl.textContent = displayName;
-      if (fileEl) fileEl.textContent = '📁 ' + currentTrack;
+      if (fileEl) {
+        var folderIcon = window.Icons ? window.Icons.get('folder', { size: 12, className: 'inline mr-1 text-muted' }) : '';
+        fileEl.innerHTML = folderIcon + '<span>' + currentTrack + '</span>';
+      }
 
       if (maxLoop !== 1) {
         if (loopBadge) loopBadge.classList.remove('hidden');
@@ -252,27 +418,17 @@
 
   function updatePlayState() {
     var stateEl = document.getElementById('stream-playing-state');
-    if (stateEl) {
-      if (audioEl.paused) {
-        stateEl.textContent = '⏸ Paused';
-        stateEl.className = 'text-sm text-muted font-bold mt-1';
+    var media = getActiveMedia();
+    if (stateEl && media) {
+      if (media.paused) {
+        var pauseIcon = window.Icons ? window.Icons.get('pause', { size: 12, className: 'inline mr-1' }) : '';
+        stateEl.innerHTML = pauseIcon + '<span>Paused</span>';
+        stateEl.className = 'text-xs sm:text-sm text-muted font-bold mt-1 px-3 py-0.5 rounded-full bg-dark-700/50 border border-dark-500 inline-flex items-center';
       } else {
-        stateEl.textContent = '▶ Playing';
-        stateEl.className = 'text-sm text-accent font-bold mt-1';
+        var playIcon = window.Icons ? window.Icons.get('play', { size: 12, className: 'inline mr-1' }) : '';
+        stateEl.innerHTML = playIcon + '<span>Playing</span>';
+        stateEl.className = 'text-xs sm:text-sm text-accent font-bold mt-1 px-3 py-0.5 rounded-full bg-accent/10 border border-accent/20 inline-flex items-center';
       }
-    }
-  }
-
-  function updateVolumeUI() {
-    var bar = document.getElementById('stream-vol-bar');
-    var label = document.getElementById('stream-vol-label');
-    var icon = document.getElementById('stream-vol-icon');
-    if (bar) bar.style.width = (currentVolume * 100) + '%';
-    if (label) label.textContent = Math.round(currentVolume * 100) + '%';
-    if (icon) {
-      if (currentVolume === 0) icon.textContent = '🔇';
-      else if (currentVolume < 0.5) icon.textContent = '🔉';
-      else icon.textContent = '🔊';
     }
   }
 
@@ -280,19 +436,20 @@
     var bar = document.getElementById('stream-progress');
     var timeCurrent = document.getElementById('stream-time-current');
     var timeTotal = document.getElementById('stream-time-total');
+    var media = getActiveMedia();
 
-    if (audioEl.duration && isFinite(audioEl.duration)) {
-      var pct = (audioEl.currentTime / audioEl.duration) * 100;
+    if (media && media.duration && isFinite(media.duration)) {
+      var pct = (media.currentTime / media.duration) * 100;
       if (bar) bar.style.width = pct + '%';
-      if (timeCurrent) timeCurrent.textContent = formatTime(audioEl.currentTime);
-      if (timeTotal) timeTotal.textContent = formatTime(audioEl.duration);
+      if (timeCurrent) timeCurrent.textContent = formatTime(media.currentTime);
+      if (timeTotal) timeTotal.textContent = formatTime(media.duration);
     }
   }
 
   audioEl.addEventListener('timeupdate', updateProgress);
   audioEl.addEventListener('loadedmetadata', function () {
     var timeTotal = document.getElementById('stream-time-total');
-    if (timeTotal) timeTotal.textContent = formatTime(audioEl.duration);
+    if (timeTotal && isFinite(audioEl.duration)) timeTotal.textContent = formatTime(audioEl.duration);
   });
   audioEl.addEventListener('play', updatePlayState);
   audioEl.addEventListener('pause', updatePlayState);
@@ -307,7 +464,10 @@
 
     switch (status) {
       case 'waiting':
-        if (icon) { icon.textContent = '📡'; icon.className = 'text-5xl mb-4 pulse-waiting'; }
+        if (icon) {
+          icon.className = 'text-4xl mb-3 flex items-center justify-center pulse-waiting text-yellow-400';
+          icon.innerHTML = window.Icons ? window.Icons.get('broadcast', { size: 48, className: 'text-yellow-400' }) : '';
+        }
         if (label) { label.textContent = 'กำลังรอการเชื่อมต่อจากรีโมท...'; label.className = 'text-xl font-bold text-yellow-400'; }
         if (sub) sub.textContent = 'เปิดหน้านี้ทิ้งไว้บนคอมพิวเตอร์ห้องโสตฯ';
         if (card) card.className = 'bg-dark-800 border border-dark-500 rounded-2xl p-8 mb-6 text-center glow-accent transition-all duration-500';
@@ -315,7 +475,10 @@
         break;
 
       case 'connected':
-        if (icon) { icon.textContent = '🟢'; icon.className = 'text-5xl mb-4 pulse-connected'; }
+        if (icon) {
+          icon.className = 'text-4xl mb-3 flex items-center justify-center pulse-connected text-green-400';
+          icon.innerHTML = window.Icons ? window.Icons.get('check', { size: 48, className: 'text-green-400' }) : '';
+        }
         if (label) { label.textContent = 'เชื่อมต่อกับรีโมทแล้ว!'; label.className = 'text-xl font-bold text-green-400'; }
         if (sub) sub.textContent = 'พร้อมรับคำสั่งจากมือถือ / แล็ปท็อป';
         if (card) card.className = 'bg-dark-800 border border-green-500/30 rounded-2xl p-8 mb-6 text-center transition-all duration-500';
@@ -323,14 +486,20 @@
         break;
 
       case 'disconnected':
-        if (icon) { icon.textContent = '🔴'; icon.className = 'text-5xl mb-4'; }
+        if (icon) {
+          icon.className = 'text-4xl mb-3 flex items-center justify-center text-red-400';
+          icon.innerHTML = window.Icons ? window.Icons.get('warning', { size: 48, className: 'text-red-400' }) : '';
+        }
         if (label) { label.textContent = 'ขาดการเชื่อมต่อ'; label.className = 'text-xl font-bold text-red-400'; }
         if (sub) sub.textContent = 'กำลังเชื่อมต่อใหม่...';
         if (card) card.className = 'bg-dark-800 border border-red-500/30 rounded-2xl p-8 mb-6 text-center transition-all duration-500';
         break;
 
       case 'no_room':
-        if (icon) { icon.textContent = '⏳'; icon.className = 'text-5xl mb-4'; }
+        if (icon) {
+          icon.className = 'text-4xl mb-3 flex items-center justify-center text-muted';
+          icon.innerHTML = window.Icons ? window.Icons.get('clock', { size: 48, className: 'text-muted' }) : '';
+        }
         if (label) { label.textContent = 'ยังไม่มี Streaming Room'; label.className = 'text-xl font-bold text-muted'; }
         if (sub) sub.textContent = 'กรุณาเปิด Streaming จากหน้า Controller ก่อน';
         if (card) card.className = 'bg-dark-800 border border-dark-500 rounded-2xl p-8 mb-6 text-center transition-all duration-500';
@@ -438,7 +607,8 @@
 
       case 'play':
         if (data.filename) {
-          play('/uploads/' + encodeURIComponent(data.filename), data.filename, data.loop);
+          var encodedFile = (data.filename || '').split('/').map(encodeURIComponent).join('/');
+          play('/uploads/' + encodedFile, data.filename, data.loop);
         }
         break;
 
@@ -469,11 +639,15 @@
       case 'playlist_sync':
         // Receive full playlist — play the specified track
         if (data.filename) {
-          play('/uploads/' + encodeURIComponent(data.filename), data.filename, data.loop);
+          var encodedSync = (data.filename || '').split('/').map(encodeURIComponent).join('/');
+          play('/uploads/' + encodedSync, data.filename, data.loop);
         }
         if (data.volume !== undefined) {
           setVolume(data.volume / 100);
         }
+        break;
+      case 'pong':
+        // Heartbeat keepalive response
         break;
 
       case 'error':
@@ -485,21 +659,31 @@
   // ── Send state updates to Controller ──────────────────
   function sendState() {
     if (!controllerConnected) return;
+    var media = getActiveMedia();
     wsSend({
       type: 'state_update',
-      playing: !audioEl.paused,
-      currentTime: audioEl.currentTime || 0,
-      duration: audioEl.duration || 0,
+      playing: media ? !media.paused : false,
+      currentTime: media ? (media.currentTime || 0) : 0,
+      duration: media ? (media.duration || 0) : 0,
       track: currentTrack,
       volume: Math.round(currentVolume * 100),
       loop: currentLoop,
       maxLoop: maxLoop,
       ducked: isDucked,
+      isVideo: isCurrentMediaVideo,
+      streamMode: streamMode,
     });
   }
 
   // Send state every second
   setInterval(sendState, 1000);
+
+  // Keepalive ping every 15s to keep WebSocket connection active
+  setInterval(function () {
+    if (isConnected && ws && ws.readyState === 1) {
+      wsSend({ type: 'ping' });
+    }
+  }, 15000);
 
   // ── Helpers ───────────────────────────────────────────
   function formatTime(sec) {

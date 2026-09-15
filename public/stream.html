@@ -26,6 +26,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="/js/icons.js?v=1.2.1"></script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; cursor: none; }
@@ -75,20 +76,56 @@
       0% { transform: translateX(100%); }
       100% { transform: translateX(-100%); }
     }
+
+    /* Video Fullscreen Mode (Receiver Stream) */
+    #video-container:fullscreen,
+    #video-container:-webkit-full-screen,
+    #video-container.is-fullscreen {
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      border: none !important;
+      border-radius: 0 !important;
+      background-color: #000000 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow: hidden !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      z-index: 999999 !important;
+    }
+
+    #video-container:fullscreen #receiver-video,
+    #video-container:-webkit-full-screen #receiver-video,
+    #video-container.is-fullscreen #receiver-video {
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      object-fit: contain !important;
+      background-color: #000000 !important;
+    }
   </style>
 </head>
 <body class="bg-dark-900 text-gray-200 min-h-screen flex items-center justify-center select-none pt-10">
 
   <!-- Red Warning Banner -->
   <div id="pr-warning-banner" class="fixed top-0 left-0 right-0 z-40 bg-red-600/90 text-white px-6 py-2 text-xs font-bold flex items-center justify-center shadow-md border-b border-red-500 text-center">
-    <span class="mr-2 text-sm animate-pulse">⚠️</span>
+    <span data-icon="warning" data-icon-size="16" class="mr-2 text-white"></span>
     <span>ระบบนี้จำเป็นต้องใช้ในห้องประชาสัมพันธ์ และต้องทำงานตลอดเวลา (ห้ามปิดหน้าจอนี้)</span>
   </div>
 
   <!-- Autoplay / Gesture Unlock Overlay -->
   <div id="unlock-overlay" class="fixed inset-0 z-50 bg-dark-900/95 backdrop-blur-md flex flex-col items-center justify-center p-6 transition-all duration-500">
     <div class="bg-dark-800 border border-accent/30 rounded-2xl p-8 max-w-md w-full text-center glow-accent shadow-2xl">
-      <div class="text-7xl mb-6 animate-pulse">🔊</div>
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-accent/20 border border-accent/40 flex items-center justify-center text-accent shadow-lg shadow-accent/20">
+        <span data-icon="volume" data-icon-size="32"></span>
+      </div>
       <h2 class="text-2xl font-bold text-accent mb-3">เปิดใช้งานระบบเสียง</h2>
       <p class="text-gray-300 text-sm mb-6 leading-relaxed">
         เนื่องจากข้อกำหนดความปลอดภัยของเว็บบราวเซอร์ (Autoplay Policy) กรุณาคลิกปุ่มด้านล่างเพื่ออนุญาตให้สตรีมเสียงมายังเครื่องนี้
@@ -100,40 +137,76 @@
   </div>
 
   <!-- ════════════════ MAIN CONTAINER ════════════════ -->
-  <div id="stream-container" class="w-full max-w-3xl mx-auto p-8 fade-in">
+  <div id="stream-container" class="w-full max-w-4xl mx-auto p-4 sm:p-8 fade-in">
 
     <!-- Header -->
-    <div class="text-center mb-8">
-      <div class="text-6xl mb-4">🔊</div>
-      <h1 class="text-3xl font-bold text-accent tracking-tight">FallingLight</h1>
-      <p class="text-muted text-sm mt-1">Streaming Receiver — ตัวรับสตรีมมิ่ง</p>
+    <div class="text-center mb-6">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-accent/30 to-purple-600/20 border border-accent/40 mb-3 shadow-lg shadow-accent/10">
+        <span data-icon="broadcast" data-icon-size="32" class="text-accent" id="header-mode-icon"></span>
+      </div>
+      <h1 class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent tracking-tight">FallingLight Stream</h1>
+      <p class="text-muted text-xs sm:text-sm mt-1">Streaming Receiver — ระบบรับสัญญาณถ่ายทอด</p>
+
+      <!-- Mode Selector Pills -->
+      <div class="flex items-center justify-center gap-2 mt-4 flex-wrap text-xs">
+        <a href="/stream" id="mode-pill-both" class="mode-pill px-3 py-1.5 rounded-xl border border-dark-500 bg-dark-800 text-gray-300 hover:border-accent hover:text-white transition flex items-center gap-1.5 shadow-sm">
+          <span data-icon="broadcast" data-icon-size="14"></span>
+          <span>ภาพ + เสียง (All)</span>
+        </a>
+        <a href="/stream/audio" id="mode-pill-audio" class="mode-pill px-3 py-1.5 rounded-xl border border-dark-500 bg-dark-800 text-gray-300 hover:border-accent hover:text-white transition flex items-center gap-1.5 shadow-sm">
+          <span data-icon="music" data-icon-size="14"></span>
+          <span>เสียงเท่านั้น (Audio)</span>
+        </a>
+        <a href="/stream/video" id="mode-pill-video" class="mode-pill px-3 py-1.5 rounded-xl border border-dark-500 bg-dark-800 text-gray-300 hover:border-accent hover:text-white transition flex items-center gap-1.5 shadow-sm">
+          <span data-icon="video" data-icon-size="14"></span>
+          <span>ภาพเท่านั้น (Video)</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Video Player Display (Active for Video files in both / video modes) -->
+    <div id="video-container" class="hidden mb-6 rounded-2xl overflow-hidden bg-black/90 border border-accent/40 shadow-2xl relative group transition-all duration-300 glow-accent">
+      <video id="receiver-video" playsinline class="w-full max-h-[65vh] object-contain mx-auto bg-black"></video>
+      <div class="absolute top-3 left-3 bg-dark-900/85 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-accent border border-accent/30 flex items-center gap-1.5 shadow-md">
+        <span class="w-2 h-2 rounded-full bg-accent animate-ping"></span>
+        <span id="video-mode-label">LIVE VIDEO</span>
+      </div>
+      <button id="btn-fullscreen" class="absolute bottom-3 right-3 bg-dark-900/80 hover:bg-accent text-white px-3 py-1.5 rounded-xl text-xs font-medium border border-dark-500 hover:border-accent transition flex items-center gap-1 shadow-lg">
+        <span data-icon="fullscreen" data-icon-size="14"></span>
+        <span>เต็มจอ</span>
+      </button>
     </div>
 
     <!-- Connection Status -->
-    <div id="status-card" class="bg-dark-800 border border-dark-500 rounded-2xl p-8 mb-6 text-center glow-accent transition-all duration-500">
-      <div id="status-icon" class="text-5xl mb-4 pulse-waiting">📡</div>
+    <div id="status-card" class="bg-dark-800/90 backdrop-blur-md border border-dark-500 rounded-2xl p-8 mb-6 text-center glow-accent transition-all duration-500 shadow-xl">
+      <div id="status-icon" class="text-4xl mb-3 flex items-center justify-center pulse-waiting text-yellow-400">
+        <span data-icon="broadcast" data-icon-size="44"></span>
+      </div>
       <div id="status-label" class="text-xl font-bold text-yellow-400">กำลังรอการเชื่อมต่อจากรีโมท...</div>
       <div id="status-sub" class="text-sm text-muted mt-2">เปิดหน้านี้ทิ้งไว้บนคอมพิวเตอร์ห้องโสตฯ</div>
     </div>
 
     <!-- Now Playing (hidden until connected) -->
-    <div id="now-playing" class="hidden bg-dark-800 border border-dark-500 rounded-2xl p-6 mb-6 transition-all duration-300">
+    <div id="now-playing" class="hidden bg-dark-800/90 backdrop-blur-md border border-dark-500 rounded-2xl p-6 mb-6 transition-all duration-300 shadow-xl">
       <!-- Track Info -->
       <div class="flex items-center gap-4 mb-5">
-        <div class="text-4xl">🎵</div>
-        <div class="flex-1 min-w-0">
-          <div id="stream-track-title" class="text-2xl font-bold truncate">—</div>
-          <div id="stream-track-file" class="text-sm text-muted mt-0.5 truncate">ไม่มีเพลงที่เล่น</div>
+        <div class="w-12 h-12 rounded-xl bg-dark-700/80 border border-dark-500 flex items-center justify-center text-accent shadow-inner" id="stream-media-icon">
+          <span data-icon="music" data-icon-size="24"></span>
         </div>
-        <div id="stream-loop-badge" class="hidden px-3 py-1 bg-accent/20 text-accent rounded-full text-sm font-bold">
-          🔁 <span id="stream-loop-text">1/1</span>
+        <div class="flex-1 min-w-0">
+          <div id="stream-track-title" class="text-xl sm:text-2xl font-bold truncate tracking-tight text-white">—</div>
+          <div id="stream-track-file" class="text-xs sm:text-sm text-muted mt-0.5 truncate">ไม่มีเพลงที่เล่น</div>
+        </div>
+        <div id="stream-loop-badge" class="hidden px-3 py-1 bg-accent/20 border border-accent/40 text-accent rounded-full text-xs font-bold shadow-sm flex items-center gap-1">
+          <span data-icon="refresh" data-icon-size="12"></span>
+          <span id="stream-loop-text">1/1</span>
         </div>
       </div>
 
       <!-- Progress Bar -->
       <div class="mb-4">
-        <div class="w-full bg-dark-900 rounded-full h-3 border border-dark-500 overflow-hidden">
-          <div id="stream-progress" class="bg-gradient-to-r from-accent to-accent-light h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+        <div class="w-full bg-dark-900 rounded-full h-2.5 border border-dark-500 overflow-hidden shadow-inner">
+          <div id="stream-progress" class="bg-gradient-to-r from-accent to-pink-500 h-2.5 rounded-full transition-all duration-300 shadow-md shadow-accent/30" style="width: 0%"></div>
         </div>
         <div class="flex justify-between text-xs text-muted font-mono mt-2">
           <span id="stream-time-current">0:00</span>
@@ -142,39 +215,43 @@
       </div>
 
       <!-- VU Meters -->
-      <div class="flex items-end justify-center gap-6 h-28 mb-4">
+      <div id="vu-container" class="flex items-end justify-center gap-6 h-28 mb-4">
         <div class="flex flex-col items-center gap-1">
-          <div class="w-10 h-24 bg-dark-900 rounded-lg border border-dark-500 overflow-hidden flex flex-col-reverse">
+          <div class="w-10 h-24 bg-dark-900 rounded-lg border border-dark-500 overflow-hidden flex flex-col-reverse shadow-inner">
             <div id="stream-vu-left" class="vu-bar w-full rounded-lg" style="height:0%;background:linear-gradient(to top,#3fb950 60%,#d29922 80%,#e94560 100%)"></div>
           </div>
-          <span class="text-xs text-muted">L</span>
+          <span class="text-xs text-muted font-bold font-mono">L</span>
         </div>
         <div class="flex flex-col items-center gap-1">
           <div id="stream-vu-db" class="text-2xl font-mono text-muted font-bold">-∞ dB</div>
-          <div id="stream-playing-state" class="text-sm text-accent font-bold mt-1">⏸ Paused</div>
+          <div id="stream-playing-state" class="text-xs sm:text-sm text-accent font-bold mt-1 px-3 py-0.5 rounded-full bg-accent/10 border border-accent/20">Paused</div>
         </div>
         <div class="flex flex-col items-center gap-1">
-          <div class="w-10 h-24 bg-dark-900 rounded-lg border border-dark-500 overflow-hidden flex flex-col-reverse">
+          <div class="w-10 h-24 bg-dark-900 rounded-lg border border-dark-500 overflow-hidden flex flex-col-reverse shadow-inner">
             <div id="stream-vu-right" class="vu-bar w-full rounded-lg" style="height:0%;background:linear-gradient(to top,#3fb950 60%,#d29922 80%,#e94560 100%)"></div>
           </div>
-          <span class="text-xs text-muted">R</span>
+          <span class="text-xs text-muted font-bold font-mono">R</span>
         </div>
       </div>
 
       <!-- Volume Display -->
-      <div class="flex items-center justify-center gap-3">
-        <span class="text-2xl" id="stream-vol-icon">🔊</span>
-        <div class="w-48 bg-dark-900 rounded-full h-2 border border-dark-500 overflow-hidden">
-          <div id="stream-vol-bar" class="bg-accent h-2 rounded-full transition-all duration-200" style="width: 80%"></div>
+      <div id="volume-container" class="flex items-center justify-center gap-3">
+        <span class="text-muted flex items-center" id="stream-vol-icon">
+          <span data-icon="volume" data-icon-size="20"></span>
+        </span>
+        <div class="w-48 bg-dark-900 rounded-full h-2 border border-dark-500 overflow-hidden shadow-inner">
+          <div id="stream-vol-bar" class="bg-gradient-to-r from-accent to-accent-light h-2 rounded-full transition-all duration-200" style="width: 80%"></div>
         </div>
-        <span id="stream-vol-label" class="text-sm font-mono text-muted w-12 text-right">80%</span>
+        <span id="stream-vol-label" class="text-xs sm:text-sm font-mono text-muted w-12 text-right">80%</span>
       </div>
     </div>
 
     <!-- Ducking Indicator -->
-    <div id="duck-indicator" class="hidden bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 mb-6 text-center">
-      <div class="text-3xl mb-1">🎙</div>
-      <div class="text-yellow-400 font-bold">ไมค์เปิด — เสียงถูกหรี่ลง</div>
+    <div id="duck-indicator" class="hidden bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 mb-6 text-center shadow-lg">
+      <div class="w-12 h-12 mx-auto mb-1 rounded-xl bg-yellow-500/20 flex items-center justify-center text-yellow-400">
+        <span data-icon="mic" data-icon-size="24"></span>
+      </div>
+      <div class="text-yellow-400 font-bold text-sm">ไมค์เปิด — เสียงถูกหรี่ลง (MIC DUCK)</div>
     </div>
 
     <!-- Connection Info Footer -->

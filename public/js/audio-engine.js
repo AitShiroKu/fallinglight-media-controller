@@ -15,6 +15,10 @@
   audioEl.crossOrigin = 'anonymous';
   audioEl.preload = 'auto';
 
+  let videoEl = null;
+  let videoContainer = null;
+  let isVideoMedia = false;
+
   let audioCtx = null;
   let analyserL = null;
   let analyserR = null;
@@ -54,6 +58,63 @@
   let dataR = null;
   let vuRafId = null;
 
+  function isVideoPath(name) {
+    return /\.(mp4|webm|mkv|avi)$/i.test(name || '');
+  }
+
+  function initVideoElements() {
+    if (!videoEl) {
+      videoEl = document.getElementById('controller-video');
+      videoContainer = document.getElementById('video-preview-container');
+      if (videoEl) {
+        videoEl.crossOrigin = 'anonymous';
+        videoEl.preload = 'auto';
+
+        videoEl.addEventListener('timeupdate', function () {
+          if (!isVideoMedia || remoteMode) return;
+          var seekBar = document.getElementById('seek-bar');
+          var timeCurrent = document.getElementById('time-current');
+          if (seekBar && videoEl.duration) {
+            seekBar.value = (videoEl.currentTime / videoEl.duration * 1000) | 0;
+          }
+          if (timeCurrent) timeCurrent.textContent = formatTime(videoEl.currentTime);
+        });
+
+        videoEl.addEventListener('loadedmetadata', function () {
+          if (!isVideoMedia || remoteMode) return;
+          var timeTotal = document.getElementById('time-total');
+          if (timeTotal) timeTotal.textContent = formatTime(videoEl.duration);
+        });
+
+        videoEl.addEventListener('play', function () {
+          if (isVideoMedia && !remoteMode) updatePlayButton(true);
+        });
+
+        videoEl.addEventListener('pause', function () {
+          if (isVideoMedia && !remoteMode) updatePlayButton(false);
+        });
+
+        videoEl.addEventListener('ended', function () {
+          if (!isVideoMedia || remoteMode) return;
+          updatePlayButton(false);
+          stopVU();
+          if (window.playlist) window.playlist.onTrackEnded();
+        });
+      }
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initVideoElements);
+  } else {
+    initVideoElements();
+  }
+
+  function getActiveMedia() {
+    initVideoElements();
+    return (isVideoMedia && videoEl) ? videoEl : audioEl;
+  }
+
   // ── Audio Context Setup ───────────────────────────────
   function ensureContext() {
     if (audioCtx) return;
@@ -68,18 +129,18 @@
     dataR = new Uint8Array(analyserR.frequencyBinCount);
   }
 
-  function connectSource() {
-    if (isCtxConnected) return;
+  function connectSource(targetEl) {
     ensureContext();
+    targetEl = targetEl || getActiveMedia();
     try {
-      sourceNode = audioCtx.createMediaElementSource(audioEl);
+      sourceNode = audioCtx.createMediaElementSource(targetEl);
       sourceNode.connect(splitter);
       splitter.connect(analyserL, 0);
       splitter.connect(analyserR, 1);
       sourceNode.connect(audioCtx.destination);
       isCtxConnected = true;
     } catch (e) {
-      // Already connected (only one MediaElementSource per element)
+      // Already connected (only one MediaElementSource per element allowed)
       isCtxConnected = true;
     }
   }
@@ -94,14 +155,41 @@
       return;
     }
 
+    initVideoElements();
     ensureContext();
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    audioEl.src = url;
-    audioEl.volume = isDucked ? configDuckVolume : currentVolume;
-    const p = audioEl.play();
-    if (p) p.catch(() => {});
-    connectSource();
+    isVideoMedia = isVideoPath(url);
+
+    if (isVideoMedia && videoEl) {
+      // Pause and clear audio element
+      audioEl.pause();
+      audioEl.currentTime = 0;
+      audioEl.src = '';
+
+      if (videoContainer) videoContainer.classList.remove('hidden');
+      videoEl.src = url;
+      videoEl.volume = isDucked ? configDuckVolume : currentVolume;
+      videoEl.muted = isMuted;
+      const p = videoEl.play();
+      if (p) p.catch(() => {});
+      connectSource(videoEl);
+    } else {
+      // Audio only playback
+      if (videoEl) {
+        videoEl.pause();
+        videoEl.src = '';
+      }
+      if (videoContainer) videoContainer.classList.add('hidden');
+
+      audioEl.src = url;
+      audioEl.volume = isDucked ? configDuckVolume : currentVolume;
+      audioEl.muted = isMuted;
+      const p = audioEl.play();
+      if (p) p.catch(() => {});
+      connectSource(audioEl);
+    }
+
     startVU();
   }
 
@@ -111,11 +199,12 @@
       return;
     }
 
-    if (audioEl.paused) {
-      audioEl.play().catch(() => {});
+    var media = getActiveMedia();
+    if (media.paused) {
+      media.play().catch(() => {});
       startVU();
     } else {
-      audioEl.pause();
+      media.pause();
     }
   }
 
@@ -126,8 +215,13 @@
       return;
     }
 
-    audioEl.pause();
-    audioEl.currentTime = 0;
+    var media = getActiveMedia();
+    media.pause();
+    media.currentTime = 0;
+    if (videoEl && !isVideoMedia) {
+      videoEl.pause();
+      videoEl.src = '';
+    }
     stopVU();
   }
 
@@ -139,10 +233,11 @@
       return;
     }
 
+    var media = getActiveMedia();
     durationMs = durationMs || configFadeDuration;
-    startFade(audioEl.volume, 0, durationMs, function () {
+    startFade(media.volume, 0, durationMs, function () {
       stop();
-      audioEl.volume = currentVolume;
+      media.volume = currentVolume;
       updatePlayButton();
       updateStatus('Stopped');
     });
@@ -154,8 +249,9 @@
       return;
     }
 
-    if (audioEl.duration && isFinite(audioEl.duration)) {
-      audioEl.currentTime = ratio * audioEl.duration;
+    var media = getActiveMedia();
+    if (media.duration && isFinite(media.duration)) {
+      media.currentTime = ratio * media.duration;
     }
   }
 
@@ -167,10 +263,12 @@
       window.streamController.sendVolume(currentVolume * 100);
     }
 
+    var media = getActiveMedia();
     if (!isDucked && !fadeRafId) {
-      audioEl.volume = currentVolume;
+      media.volume = currentVolume;
     }
     isMuted = currentVolume === 0;
+    media.muted = isMuted;
     updateVolumeUI();
   }
 
@@ -199,7 +297,7 @@
       isDucked = true;
       window.streamController.sendDuck(true);
       updateMicButton(true);
-      updateStatus(window.appI18n ? window.appI18n.tr('status_mic_on') : '🎙 MIC ON');
+      updateStatus(window.appI18n ? window.appI18n.tr('status_mic_on') : 'MIC ON — Ducked');
       return;
     }
 
@@ -207,10 +305,11 @@
     durationMs = durationMs || configDuckDuration;
     if (isDucked) return;
     isDucked = true;
-    preDuckVolume = audioEl.volume;
-    startFade(audioEl.volume, targetVol, durationMs);
+    var media = getActiveMedia();
+    preDuckVolume = media.volume;
+    startFade(media.volume, targetVol, durationMs);
     updateMicButton(true);
-    updateStatus(window.appI18n ? window.appI18n.tr('status_mic_on') : '🎙 MIC ON');
+    updateStatus(window.appI18n ? window.appI18n.tr('status_mic_on') : 'MIC ON — Ducked');
   }
 
   function unduck(durationMs) {
@@ -225,7 +324,8 @@
     durationMs = durationMs || configFadeDuration;
     if (!isDucked) return;
     isDucked = false;
-    startFade(audioEl.volume, currentVolume, durationMs);
+    var media = getActiveMedia();
+    startFade(media.volume, currentVolume, durationMs);
     updateMicButton(false);
     updateStatus(window.appI18n ? window.appI18n.tr('status_mic_off') : 'MIC OFF');
   }
@@ -247,13 +347,14 @@
     // Cubic ease-out
     var eased = 1 - Math.pow(1 - progress, 3);
     var vol = fadeStartVol + (fadeEndVol - fadeStartVol) * eased;
-    audioEl.volume = Math.max(0, Math.min(1, vol));
+    var media = getActiveMedia();
+    media.volume = Math.max(0, Math.min(1, vol));
 
     if (progress < 1) {
       fadeRafId = requestAnimationFrame(fadeStep);
     } else {
       fadeRafId = null;
-      audioEl.volume = fadeEndVol;
+      media.volume = fadeEndVol;
       if (fadeCallback) {
         var cb = fadeCallback;
         fadeCallback = null;
@@ -313,6 +414,7 @@
 
   // ── Audio Element Events ──────────────────────────────
   audioEl.addEventListener('timeupdate', function () {
+    if (isVideoMedia || remoteMode) return;
     var seekBar = document.getElementById('seek-bar');
     var timeCurrent = document.getElementById('time-current');
     if (seekBar && audioEl.duration) {
@@ -322,19 +424,21 @@
   });
 
   audioEl.addEventListener('loadedmetadata', function () {
+    if (isVideoMedia || remoteMode) return;
     var timeTotal = document.getElementById('time-total');
     if (timeTotal) timeTotal.textContent = formatTime(audioEl.duration);
   });
 
   audioEl.addEventListener('play', function () {
-    updatePlayButton(true);
+    if (!isVideoMedia && !remoteMode) updatePlayButton(true);
   });
 
   audioEl.addEventListener('pause', function () {
-    updatePlayButton(false);
+    if (!isVideoMedia && !remoteMode) updatePlayButton(false);
   });
 
   audioEl.addEventListener('ended', function () {
+    if (isVideoMedia || remoteMode) return;
     updatePlayButton(false);
     stopVU();
     if (window.playlist) window.playlist.onTrackEnded();
@@ -343,7 +447,9 @@
   // ── UI Helpers ────────────────────────────────────────
   function updatePlayButton(playing) {
     var btn = document.getElementById('btn-play');
-    if (btn) btn.textContent = playing ? '⏸' : '▶';
+    if (btn && window.Icons) {
+      btn.innerHTML = window.Icons.get(playing ? 'pause' : 'play', { size: 28 });
+    }
   }
 
   function updateVolumeUI() {
@@ -352,10 +458,9 @@
     var btn = document.getElementById('btn-mute');
     if (slider) slider.value = currentVolume * 100;
     if (label) label.textContent = Math.round(currentVolume * 100) + '%';
-    if (btn) {
-      if (currentVolume === 0) btn.textContent = '🔇';
-      else if (currentVolume < 0.5) btn.textContent = '🔉';
-      else btn.textContent = '🔊';
+    if (btn && window.Icons) {
+      var iconName = currentVolume === 0 ? 'volume-x' : (currentVolume < 0.5 ? 'volume-1' : 'volume');
+      btn.innerHTML = window.Icons.get(iconName, { size: 20 });
     }
   }
 
@@ -363,12 +468,13 @@
     var btn = document.getElementById('btn-mic');
     if (!btn) return;
     var tr = window.appI18n ? window.appI18n.tr : function(k){return k;};
+    var micIcon = window.Icons ? window.Icons.get('mic', { size: 20, className: active ? 'text-white' : 'text-yellow-400' }) : '';
     if (active) {
-      btn.className = 'w-full py-3 rounded-xl border-2 border-accent bg-accent text-white font-bold text-lg transition mic-pulse';
-      btn.innerHTML = '🎙 ' + tr('btn_mic_active');
+      btn.className = 'touch-btn w-full min-h-[50px] py-3.5 px-4 rounded-2xl border-2 border-accent bg-accent text-white font-bold text-sm flex items-center justify-center gap-2.5 transition mic-pulse shadow-lg shadow-accent/40';
+      btn.innerHTML = micIcon + ' <span>' + tr('btn_mic_active') + '</span>';
     } else {
-      btn.className = 'w-full py-3 rounded-xl border-2 border-yellow-500 text-yellow-400 font-bold text-lg hover:bg-yellow-500/10 transition';
-      btn.innerHTML = '🎙 ' + tr('btn_mic');
+      btn.className = 'touch-btn w-full min-h-[50px] py-3.5 px-4 bg-dark-700 hover:bg-dark-600 border-2 border-yellow-500/80 rounded-2xl font-bold text-sm text-yellow-400 flex items-center justify-center gap-2.5 transition shadow-md';
+      btn.innerHTML = micIcon + ' <span>' + tr('btn_mic') + '</span>';
     }
   }
 
@@ -393,6 +499,61 @@
     }
   }
 
+  function handleFullscreenChange() {
+    var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    var isContainerFs = isFs && (document.fullscreenElement === videoContainer || document.webkitFullscreenElement === videoContainer || document.fullscreenElement === videoEl);
+    if (videoContainer) {
+      if (isContainerFs) {
+        videoContainer.classList.add('is-fullscreen');
+      } else {
+        videoContainer.classList.remove('is-fullscreen');
+      }
+    }
+    var fsBtn = document.getElementById('btn-video-fullscreen');
+    if (fsBtn) {
+      fsBtn.title = isContainerFs ? 'Exit Fullscreen' : 'Fullscreen';
+      var iconSpan = fsBtn.querySelector('[data-icon]');
+      if (iconSpan) {
+        iconSpan.setAttribute('data-icon', isContainerFs ? 'minimize' : 'maximize');
+        if (window.Icons) {
+          iconSpan.innerHTML = window.Icons.get(isContainerFs ? 'minimize' : 'maximize', { size: 14 });
+        }
+      }
+    }
+  }
+
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+  function toggleVideoPip() {
+    initVideoElements();
+    if (!videoEl) return;
+    if (document.pictureInPictureElement) {
+      document.exitPictureInPicture().catch(function () {});
+    } else if (document.pictureInPictureEnabled) {
+      videoEl.requestPictureInPicture().catch(function () {});
+    }
+  }
+
+  function toggleVideoFullscreen() {
+    initVideoElements();
+    var target = videoContainer || videoEl;
+    if (!target) return;
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      if (target.requestFullscreen) {
+        target.requestFullscreen().catch(function () {});
+      } else if (target.webkitRequestFullscreen) {
+        target.webkitRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(function () {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    }
+  }
+
   // ── Public API ────────────────────────────────────────
   window.audioEngine = {
     play: play,
@@ -405,6 +566,8 @@
     toggleDuck: toggleDuck,
     duck: duck,
     unduck: unduck,
+    toggleVideoPip: toggleVideoPip,
+    toggleVideoFullscreen: toggleVideoFullscreen,
     setFadeDuration: function (sec) { configFadeDuration = sec * 1000; },
     setDuckVolume: function (vol) { configDuckVolume = vol; },
     setDuckDuration: function (ms) { configDuckDuration = ms; },
@@ -420,16 +583,64 @@
       remoteVolume = state.volume !== undefined ? state.volume : 80;
       remoteDuration = state.duration || 0;
       remoteCurrentTime = state.currentTime || 0;
+
+      initVideoElements();
+      if (remoteMode && videoEl && videoContainer) {
+        if (remoteTrack && isVideoPath(remoteTrack)) {
+          isVideoMedia = true;
+          videoContainer.classList.remove('hidden');
+          var encodedPath = remoteTrack.split('/').map(encodeURIComponent).join('/');
+          var fullVideoSrc = '/uploads/' + encodedPath;
+          if (!videoEl.src.endsWith(encodedPath)) {
+            videoEl.src = fullVideoSrc;
+          }
+          videoEl.muted = true; // Mute preview to avoid echo with stream receiver
+          if (Math.abs(videoEl.currentTime - remoteCurrentTime) > 0.5) {
+            videoEl.currentTime = remoteCurrentTime;
+          }
+          if (remotePlaying && videoEl.paused) {
+            videoEl.play().catch(function () {});
+          } else if (!remotePlaying && !videoEl.paused) {
+            videoEl.pause();
+          }
+        } else {
+          isVideoMedia = false;
+          videoContainer.classList.add('hidden');
+          if (videoEl.src) {
+            videoEl.pause();
+            videoEl.src = '';
+          }
+        }
+      }
     },
     setRemoteVU: setRemoteVU,
-    get isPlaying() { return remoteMode ? remotePlaying : !audioEl.paused; },
-    get isPaused() { return remoteMode ? !remotePlaying : audioEl.paused; },
-    get duration() { return remoteMode ? remoteDuration : (audioEl.duration || 0); },
-    get currentTime() { return remoteMode ? remoteCurrentTime : (audioEl.currentTime || 0); },
+    get isPlaying() {
+      if (remoteMode) return remotePlaying;
+      var media = getActiveMedia();
+      return !media.paused;
+    },
+    get isPaused() {
+      if (remoteMode) return !remotePlaying;
+      var media = getActiveMedia();
+      return media.paused;
+    },
+    get duration() {
+      if (remoteMode) return remoteDuration;
+      var media = getActiveMedia();
+      return media.duration || 0;
+    },
+    get currentTime() {
+      if (remoteMode) return remoteCurrentTime;
+      var media = getActiveMedia();
+      return media.currentTime || 0;
+    },
     get volume() { return remoteMode ? remoteVolume / 100 : currentVolume; },
     get isDucked() { return isDucked; },
     get remoteMode() { return remoteMode; },
     get remoteTrack() { return remoteTrack; },
+    get isVideoMedia() { return isVideoMedia; },
+    getActiveMedia: getActiveMedia,
     audioEl: audioEl,
+    get videoEl() { return videoEl; },
   };
 })();
