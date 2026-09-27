@@ -4,6 +4,9 @@
   "description": "Web-based media controller for school PR rooms — Bun + ElysiaJS",
   "scripts": {
     "dev": "bun run --watch src/index.ts",
+    "dev:ui": "cd frontend && bun run dev",
+    "build": "bun run build:ui",
+    "build:ui": "cd frontend && bun run build",
     "start": "bun run src/index.ts",
     "test": "bun test"
   },

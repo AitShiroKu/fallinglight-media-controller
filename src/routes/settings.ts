@@ -25,9 +25,9 @@ export const settingsRoutes = requireAuth(
       fadeDuration: t.Number(),
       duckVolume: t.Number(),
       duckDuration: t.Number(),
-      autoAdvance: t.Boolean(),
       ytQuality: t.String(),
       warnOnClose: t.Boolean(),
+      autoAdvance: t.Optional(t.Boolean()),
     }),
   })
 );

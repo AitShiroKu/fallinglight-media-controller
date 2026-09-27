@@ -12,6 +12,7 @@ import { schedulerRoutes } from "./routes/scheduler";
 import { settingsRoutes } from "./routes/settings";
 import { youtubeRoutes } from "./routes/youtube";
 import { streamingRoutes } from "./routes/streaming";
+import { startSchedulerDaemon } from "./services/scheduler-daemon";
 import { initStorage, UPLOADS_DIR } from "./utils/storage";
 import { join, resolve } from "node:path";
 
@@ -21,13 +22,88 @@ const PROJECT_ROOT = import.meta.dir.replace(/[/\\]src$/, "");
 // Initialize storage directories
 await initStorage();
 
+const DIST_DIR = join(PROJECT_ROOT, "dist");
+const PUBLIC_DIR = join(PROJECT_ROOT, "public");
+const hasDist = await Bun.file(join(DIST_DIR, "index.html")).exists();
+
 const app = new Elysia()
 
-  // Serve static frontend from public/
-  .use(staticPlugin({
-    assets: join(PROJECT_ROOT, "public"),
-    prefix: "/",
-  }))
+  // Serve static assets from dist/assets (React 19 + Vite SPA) if built
+  .use(
+    hasDist
+      ? staticPlugin({
+          assets: join(DIST_DIR, "assets"),
+          prefix: "/assets",
+        })
+      : (a) => a
+  )
+
+  // Serve static fallback from public/ (stream receiver assets & legacy files)
+  .use(
+    staticPlugin({
+      assets: PUBLIC_DIR,
+      prefix: "/",
+    })
+  )
+
+  // Serve main SPA application root
+  .get("/", async () => {
+    const filePath = hasDist ? join(DIST_DIR, "index.html") : join(PUBLIC_DIR, "index.html");
+    return new Response(Bun.file(filePath), {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-cache, no-store, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
+      },
+    });
+  })
+
+  // SPA Route Fallbacks
+  .get("/player", async () => {
+    const filePath = hasDist ? join(DIST_DIR, "index.html") : join(PUBLIC_DIR, "index.html");
+    return new Response(Bun.file(filePath), {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-cache, no-store, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
+      },
+    });
+  })
+  .get("/files", async () => {
+    const filePath = hasDist ? join(DIST_DIR, "index.html") : join(PUBLIC_DIR, "index.html");
+    return new Response(Bun.file(filePath), {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-cache, no-store, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
+      },
+    });
+  })
+  .get("/schedule", async () => {
+    const filePath = hasDist ? join(DIST_DIR, "index.html") : join(PUBLIC_DIR, "index.html");
+    return new Response(Bun.file(filePath), {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-cache, no-store, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
+      },
+    });
+  })
+  .get("/settings", async () => {
+    const filePath = hasDist ? join(DIST_DIR, "index.html") : join(PUBLIC_DIR, "index.html");
+    return new Response(Bun.file(filePath), {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-cache, no-store, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
+      },
+    });
+  })
 
   // Serve uploaded media files from uploads/ with Unicode, nested folders & Range support
   .get("/uploads/*", async ({ params, set }) => {
@@ -108,15 +184,19 @@ const app = new Elysia()
   .use(streamingRoutes)
 
   // Health check
-  .get("/api/health", () => ({ status: "ok", time: new Date().toISOString() }))
+  .get("/api/health", () => ({ status: "ok", time: new Date().toISOString() }));
+
+if (import.meta.main) {
+  // Start autonomous background scheduler daemon
+  startSchedulerDaemon();
 
   // Listen on all interfaces for LAN access
-  .listen({
+  app.listen({
     port: PORT,
     hostname: "0.0.0.0",
   });
 
-console.log(`
+  console.log(`
 ╔══════════════════════════════════════════════════╗
 ║   [*] FallingLight Media Controller              ║
 ║   ───────────────────────────────────────────    ║
@@ -127,6 +207,7 @@ console.log(`
 ║   Login: admin / cptw@2468                       ║
 ╚══════════════════════════════════════════════════╝
 `);
+}
 
 export { app };
 export type App = typeof app;

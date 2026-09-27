@@ -15,9 +15,9 @@ export interface AppSettings {
   fadeDuration: number;
   duckVolume: number;
   duckDuration: number;
-  autoAdvance: boolean;
   ytQuality: string;
   warnOnClose: boolean;
+  autoAdvance?: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -25,7 +25,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   fadeDuration: 1.5,
   duckVolume: 0.12,
   duckDuration: 300,
-  autoAdvance: true,
   ytQuality: "0",
   warnOnClose: true,
 };
@@ -42,6 +41,8 @@ const VIDEO_EXTENSIONS = new Set([
 export function isVideoFile(filename: string): boolean {
   return VIDEO_EXTENSIONS.has(extname(filename).toLowerCase());
 }
+
+export const isVideoPath = isVideoFile;
 
 /** Ensure required directories exist */
 export async function initStorage(): Promise<void> {

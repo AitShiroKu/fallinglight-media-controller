@@ -9,7 +9,6 @@
 
   let items = [];       // { filename, title, loop, currentLoop, pinned }
   let currentIndex = -1;
-  let configAutoAdvance = true;
   let draggedIdx = -1;
 
   // ── Public API ────────────────────────────────────────
@@ -219,19 +218,6 @@
 
       // Check per-media autoNext setting ("เล่นต่อเมื่อจบ" vs "หยุดเมื่อจบ")
       if (track.autoNext === false) {
-        window.audioEngine.stop();
-        var nextIdx = currentIndex + 1;
-        if (nextIdx < items.length) {
-          currentIndex = nextIdx;
-          updateTrackInfo(items[nextIdx]);
-        }
-        setStatus(tr('status_track_ended_stopped') || 'เล่นสื่อจบแล้ว (หยุดตามที่ตั้งค่าไว้)');
-        render();
-        return;
-      }
-
-      // Check global auto-advance setting
-      if (!configAutoAdvance) {
         window.audioEngine.stop();
         var nextIdx = currentIndex + 1;
         if (nextIdx < items.length) {
@@ -514,7 +500,7 @@
     uploadAndAdd: uploadAndAdd,
     toggleAutoNext: toggleAutoNext,
     addFolderTracks: addFolderTracks,
-    setAutoAdvance: function (val) { configAutoAdvance = val; },
+    setAutoAdvance: function () {},
     render: render,
     togglePin: togglePin,
     get items() { return items; },

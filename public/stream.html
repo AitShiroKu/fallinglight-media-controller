@@ -29,7 +29,7 @@
   <script src="/js/icons.js?v=1.2.1"></script>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; cursor: none; }
+    body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; }
     ::-webkit-scrollbar { display: none; }
 
     .vu-bar { transition: height 0.08s ease-out; }
@@ -114,7 +114,7 @@
 </head>
 <body class="bg-dark-900 text-gray-200 min-h-screen flex items-center justify-center select-none pt-10">
 
-  <!-- Red Warning Banner -->
+  <!-- Red Warning Banner (Shown only on audio/both dashboards) -->
   <div id="pr-warning-banner" class="fixed top-0 left-0 right-0 z-40 bg-red-600/90 text-white px-6 py-2 text-xs font-bold flex items-center justify-center shadow-md border-b border-red-500 text-center">
     <span data-icon="warning" data-icon-size="16" class="mr-2 text-white"></span>
     <span>ระบบนี้จำเป็นต้องใช้ในห้องประชาสัมพันธ์ และต้องทำงานตลอดเวลา (ห้ามปิดหน้าจอนี้)</span>
@@ -130,13 +130,97 @@
       <p class="text-gray-300 text-sm mb-6 leading-relaxed">
         เนื่องจากข้อกำหนดความปลอดภัยของเว็บบราวเซอร์ (Autoplay Policy) กรุณาคลิกปุ่มด้านล่างเพื่ออนุญาตให้สตรีมเสียงมายังเครื่องนี้
       </p>
-      <button id="btn-unlock-audio" class="w-full py-4 bg-accent hover:bg-accent-light text-white font-bold text-lg rounded-xl transition duration-300 transform hover:scale-[1.02] shadow-lg shadow-accent/20">
+      <button id="btn-unlock-audio" onclick="if(window.unlockAudio) window.unlockAudio(); else document.getElementById('unlock-overlay').style.display='none';" class="w-full py-4 bg-accent hover:bg-accent-light text-white font-bold text-lg rounded-xl transition duration-300 transform hover:scale-[1.02] shadow-lg shadow-accent/20 cursor-pointer">
         เปิดใช้งานเสียง (Start Audio)
       </button>
     </div>
   </div>
 
-  <!-- ════════════════ MAIN CONTAINER ════════════════ -->
+  <!-- ════════════════ DEDICATED PURE VIDEO VIEW (Active on /stream/video) ════════════════ -->
+  <div id="pure-video-view" class="hidden fixed inset-0 z-30 w-screen h-screen bg-black overflow-hidden flex items-center justify-center">
+    <!-- Standby display when waiting for video stream -->
+    <div id="video-standby" class="flex flex-col items-center justify-center text-center p-6 select-none z-10 transition-all duration-500">
+      <div class="w-20 h-20 rounded-3xl bg-dark-800/80 border border-dark-600/60 flex items-center justify-center text-accent shadow-2xl mb-4">
+        <span data-icon="video" data-icon-size="40" class="text-accent animate-pulse"></span>
+      </div>
+      <h2 class="text-xl font-bold tracking-tight text-white mb-1">FallingLight Video Stream</h2>
+      <p id="video-standby-msg" class="text-xs text-muted font-mono">STANDBY — รอการเริ่มออกอากาศจากส่วนกลาง</p>
+    </div>
+
+    <!-- Video Canvas -->
+    <video id="receiver-video-pure" playsinline class="w-full h-full object-contain mx-auto bg-black cursor-pointer"></video>
+
+    <!-- Overlay HUD (Auto-hides on idle, visible on focus/hover) -->
+    <div id="video-hud" class="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-4 sm:p-6 transition-all duration-300 opacity-0">
+      <!-- Top Bar HUD -->
+      <div class="flex items-center justify-between gap-3 w-full">
+        <!-- Live status & Title Badge -->
+        <div class="flex items-center gap-2 bg-dark-950/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-dark-600/50 shadow-xl pointer-events-auto">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+          <span class="text-xs font-bold font-mono text-emerald-400">LIVE</span>
+          <span class="text-xs text-gray-500">|</span>
+          <span id="hud-track-title" class="text-xs font-semibold text-white truncate max-w-[280px] sm:max-w-md">—</span>
+          <span id="hud-resolution-badge" class="hidden text-[10px] font-mono text-indigo-300 font-bold bg-dark-800 px-2 py-0.5 rounded-md border border-dark-600/60"></span>
+        </div>
+
+        <!-- Top Right Actions -->
+        <div class="flex items-center gap-2 pointer-events-auto">
+          <!-- Resolution Selector Dropdown for Pure Video HUD -->
+          <div class="relative inline-block text-left" id="hud-quality-dropdown">
+            <button id="btn-hud-quality" class="touch-btn px-2.5 py-1.5 rounded-xl bg-dark-950/80 backdrop-blur-md border border-dark-600/50 text-indigo-300 hover:text-white hover:bg-dark-800 text-xs font-mono font-bold transition shadow-lg flex items-center gap-1.5" title="เลือกความละเอียดวิดิโอ">
+              <span data-icon="settings" data-icon-size="14"></span>
+              <span id="hud-quality-label">Auto</span>
+              <span class="text-[10px] text-gray-400">▼</span>
+            </button>
+            <div id="hud-quality-menu" class="hidden absolute right-0 mt-1.5 w-36 origin-top-right rounded-xl bg-dark-900/95 backdrop-blur-xl border border-dark-600/70 shadow-2xl z-50 py-1 text-xs font-mono divide-y divide-dark-700/50">
+              <button type="button" data-res="original" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+                <span>Auto (ต้นฉบับ)</span>
+                <span class="quality-check text-accent hidden">✓</span>
+              </button>
+              <button type="button" data-res="1080p" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+                <span>1080p FHD</span>
+                <span class="quality-check text-accent hidden">✓</span>
+              </button>
+              <button type="button" data-res="720p" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+                <span>720p HD</span>
+                <span class="quality-check text-accent hidden">✓</span>
+              </button>
+              <button type="button" data-res="480p" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+                <span>480p SD</span>
+                <span class="quality-check text-accent hidden">✓</span>
+              </button>
+              <button type="button" data-res="360p" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+                <span>360p ประหยัด</span>
+                <span class="quality-check text-accent hidden">✓</span>
+              </button>
+            </div>
+          </div>
+
+          <a href="/stream" class="touch-btn px-3 py-1.5 rounded-xl bg-dark-950/80 backdrop-blur-md border border-dark-600/50 text-gray-300 hover:text-white hover:bg-dark-800 text-xs font-medium transition shadow-lg flex items-center gap-1.5" title="Switch to Full Dashboard">
+            <span data-icon="broadcast" data-icon-size="14"></span>
+            <span class="hidden sm:inline">Dashboard</span>
+          </a>
+          <button id="btn-pure-fullscreen" class="touch-btn px-3 py-1.5 rounded-xl bg-dark-950/80 backdrop-blur-md border border-dark-600/50 text-white hover:bg-accent text-xs font-medium transition shadow-lg flex items-center gap-1.5">
+            <span data-icon="fullscreen" data-icon-size="14"></span>
+            <span>เต็มจอ</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Bottom Bar HUD -->
+      <div class="w-full max-w-2xl mx-auto bg-dark-950/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-dark-600/50 shadow-2xl flex flex-col gap-1.5 pointer-events-auto">
+        <div class="w-full bg-dark-800 rounded-full h-1.5 overflow-hidden">
+          <div id="hud-progress-bar" class="bg-gradient-to-r from-accent to-pink-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <div class="flex items-center justify-between text-[10px] font-mono text-muted">
+          <span id="hud-time-current">0:00</span>
+          <span id="hud-time-total">0:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════ MAIN CONTAINER (For /stream and /stream/audio) ════════════════ -->
   <div id="stream-container" class="w-full max-w-4xl mx-auto p-4 sm:p-8 fade-in">
 
     <!-- Header -->
@@ -164,12 +248,44 @@
       </div>
     </div>
 
-    <!-- Video Player Display (Active for Video files in both / video modes) -->
-    <div id="video-container" class="hidden mb-6 rounded-2xl overflow-hidden bg-black/90 border border-accent/40 shadow-2xl relative group transition-all duration-300 glow-accent">
-      <video id="receiver-video" playsinline class="w-full max-h-[65vh] object-contain mx-auto bg-black"></video>
+    <!-- Video Player Display (Active for Video files in both mode) -->
+    <div id="video-container" class="hidden mb-6 rounded-2xl bg-black/90 border border-accent/40 shadow-2xl relative group transition-all duration-300 glow-accent">
+      <video id="receiver-video" playsinline class="w-full max-h-[65vh] object-contain mx-auto bg-black rounded-2xl"></video>
       <div class="absolute top-3 left-3 bg-dark-900/85 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-accent border border-accent/30 flex items-center gap-1.5 shadow-md">
         <span class="w-2 h-2 rounded-full bg-accent animate-ping"></span>
         <span id="video-mode-label">LIVE VIDEO</span>
+      </div>
+      <div class="absolute top-3 right-3 flex items-center gap-2">
+        <!-- Quality selector for dashboard video view -->
+        <div class="relative inline-block text-left" id="dash-quality-dropdown">
+          <button id="btn-dash-quality" class="bg-dark-900/85 hover:bg-dark-800 text-indigo-300 hover:text-white px-2.5 py-1 rounded-xl text-xs font-mono font-bold border border-dark-500 transition flex items-center gap-1 shadow-lg">
+            <span data-icon="settings" data-icon-size="12"></span>
+            <span id="dash-quality-label">Auto</span>
+            <span class="text-[9px] text-gray-400">▼</span>
+          </button>
+          <div id="dash-quality-menu" class="hidden absolute right-0 mt-1.5 w-36 origin-top-right rounded-xl bg-dark-900/95 backdrop-blur-xl border border-dark-600/70 shadow-2xl z-50 py-1 text-xs font-mono divide-y divide-dark-700/50">
+            <button type="button" data-res="original" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+              <span>Auto (ต้นฉบับ)</span>
+              <span class="quality-check text-accent hidden">✓</span>
+            </button>
+            <button type="button" data-res="1080p" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+              <span>1080p FHD</span>
+              <span class="quality-check text-accent hidden">✓</span>
+            </button>
+            <button type="button" data-res="720p" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+              <span>720p HD</span>
+              <span class="quality-check text-accent hidden">✓</span>
+            </button>
+            <button type="button" data-res="480p" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+              <span>480p SD</span>
+              <span class="quality-check text-accent hidden">✓</span>
+            </button>
+            <button type="button" data-res="360p" class="quality-option w-full text-left px-3 py-1.5 hover:bg-accent/20 hover:text-white text-gray-300 transition flex items-center justify-between">
+              <span>360p ประหยัด</span>
+              <span class="quality-check text-accent hidden">✓</span>
+            </button>
+          </div>
+        </div>
       </div>
       <button id="btn-fullscreen" class="absolute bottom-3 right-3 bg-dark-900/80 hover:bg-accent text-white px-3 py-1.5 rounded-xl text-xs font-medium border border-dark-500 hover:border-accent transition flex items-center gap-1 shadow-lg">
         <span data-icon="fullscreen" data-icon-size="14"></span>

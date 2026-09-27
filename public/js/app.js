@@ -621,7 +621,8 @@
         document.getElementById('set-duck-vol').value = Math.round(settings.duckVolume * 100);
         document.getElementById('set-duck-dur').value = settings.duckDuration;
         document.getElementById('set-yt-quality').value = settings.ytQuality;
-        document.getElementById('set-auto').checked = settings.autoAdvance;
+        var setAutoEl = document.getElementById('set-auto');
+        if (setAutoEl) setAutoEl.checked = !!settings.autoAdvance;
         var warnCloseEl = document.getElementById('set-warn-close');
         if (warnCloseEl) warnCloseEl.checked = settings.warnOnClose !== false;
 
@@ -630,9 +631,6 @@
           window.audioEngine.setFadeDuration(settings.fadeDuration);
           window.audioEngine.setDuckVolume(settings.duckVolume);
           window.audioEngine.setDuckDuration(settings.duckDuration);
-        }
-        if (window.playlist) {
-          window.playlist.setAutoAdvance(settings.autoAdvance);
         }
       })
       .catch(function () { console.error('Failed to load settings'); });
@@ -647,7 +645,6 @@
       var duckVolume = parseFloat(document.getElementById('set-duck-vol').value) / 100;
       var duckDuration = parseInt(document.getElementById('set-duck-dur').value, 10) || 300;
       var ytQuality = document.getElementById('set-yt-quality').value;
-      var autoAdvance = document.getElementById('set-auto').checked;
       var warnOnClose = document.getElementById('set-warn-close') ? document.getElementById('set-warn-close').checked : true;
 
       var body = {
@@ -655,7 +652,6 @@
         fadeDuration: fadeDuration,
         duckVolume: duckVolume,
         duckDuration: duckDuration,
-        autoAdvance: autoAdvance,
         ytQuality: ytQuality,
         warnOnClose: warnOnClose
       };
