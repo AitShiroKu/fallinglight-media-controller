@@ -40,3 +40,6 @@ data/*.json
 .agents/
 .godkiller/
 .pytest_cache/
+packaging/arch/pkg/
+packaging/arch/src/
+packaging/arch/*.pkg.tar.*

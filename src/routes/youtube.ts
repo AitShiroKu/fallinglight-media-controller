@@ -9,9 +9,95 @@ import { mkdir } from "node:fs/promises";
 
 const ytJobs = new Map<string, { status: "downloading" | "success" | "error"; progress: number; filename?: string; error?: string; format?: "mp3" | "mp4" }>();
 
+export interface YouTubeSearchResult {
+  id: string;
+  title: string;
+  channel: string;
+  duration: number | null;
+  thumbnail: string;
+  url: string;
+  isLive: boolean;
+}
+
+const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+export const SEARCH_MAX_QUERY = 200;
+export const SEARCH_MAX_LIMIT = 30;
+const SEARCH_TIMEOUT_MS = 45_000;
+
+/** Convert yt-dlp `--flat-playlist -J` output into a compact result list. */
+export function parseSearchResults(raw: string): YouTubeSearchResult[] {
+  const start = raw.indexOf("{");
+  if (start < 0) return [];
+  let data: any;
+  try {
+    data = JSON.parse(raw.slice(start));
+  } catch {
+    return [];
+  }
+  const entries: any[] = Array.isArray(data?.entries) ? data.entries : [];
+  const results: YouTubeSearchResult[] = [];
+  for (const e of entries) {
+    const id = typeof e?.id === "string" ? e.id : "";
+    if (!VIDEO_ID_RE.test(id)) continue; // skip channels/playlists
+    results.push({
+      id,
+      title: String(e.title ?? id),
+      channel: String(e.channel ?? e.uploader ?? ""),
+      duration: typeof e.duration === "number" ? e.duration : null,
+      thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      isLive: e.live_status === "is_live",
+    });
+  }
+  return results;
+}
+
 export const youtubeRoutes = requireAuth(
   new Elysia({ prefix: "/api/youtube" }).use(authGuard),
   (app) => app
+
+  // GET /api/youtube/search?q=...&limit=12 — Search YouTube via yt-dlp
+  .get("/search", async ({ query, set }) => {
+    const q = (query.q ?? "").trim();
+    if (!q) {
+      set.status = 400;
+      return { error: "Missing search query" };
+    }
+    if (q.length > SEARCH_MAX_QUERY) {
+      set.status = 400;
+      return { error: "Search query too long" };
+    }
+    const limit = Math.min(Math.max(parseInt(query.limit ?? "12", 10) || 12, 1), SEARCH_MAX_LIMIT);
+
+    // Arguments are passed as argv (no shell), so the query cannot inject commands.
+    const proc = Bun.spawn(
+      ["yt-dlp", "--flat-playlist", "-J", "--no-warnings", `ytsearch${limit}:${q}`],
+      { stdout: "pipe", stderr: "pipe" }
+    );
+    const timer = setTimeout(() => proc.kill(), SEARCH_TIMEOUT_MS);
+    try {
+      const [out, err, code] = await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+        proc.exited,
+      ]);
+      if (code !== 0) {
+        set.status = 502;
+        return { error: `Search failed: ${err.trim().split("\n").pop() ?? "yt-dlp error"}` };
+      }
+      return { query: q, results: parseSearchResults(out) };
+    } catch (e: any) {
+      set.status = 500;
+      return { error: e?.message ?? "Search failed" };
+    } finally {
+      clearTimeout(timer);
+    }
+  }, {
+    query: t.Object({
+      q: t.Optional(t.String()),
+      limit: t.Optional(t.String()),
+    }),
+  })
 
   // GET /api/youtube/progress/:id — Poll job progress
   .get("/progress/:id", ({ params, set }) => {

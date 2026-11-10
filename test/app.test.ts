@@ -5,7 +5,7 @@ import { fileRoutes } from "../src/routes/files";
 import { schedulerRoutes } from "../src/routes/scheduler";
 import { settingsRoutes } from "../src/routes/settings";
 import { streamingRoutes } from "../src/routes/streaming";
-import { youtubeRoutes } from "../src/routes/youtube";
+import { youtubeRoutes, parseSearchResults, SEARCH_MAX_QUERY } from "../src/routes/youtube";
 import { createSessionToken, isValidToken } from "../src/middleware/auth-guard";
 import {
   sanitizeFilename,
@@ -445,6 +445,76 @@ describe("YouTube Downloader & Format Selector API", () => {
     const progData = await progRes.json();
     expect(typeof progData.status).toBe("string");
     expect(progData.format).toBe("mp4");
+  });
+});
+
+describe("YouTube Browser search", () => {
+  const app = new Elysia().use(authRoutes).use(youtubeRoutes);
+  let cookie = "";
+
+  beforeAll(async () => {
+    const res = await app.handle(new Request("http://localhost/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "admin", password: "cptw@2468" }),
+    }));
+    const m = (res.headers.get("set-cookie") || "").match(/session=([^;]+)/);
+    if (m) cookie = `session=${m[1]}`;
+  });
+
+  it("parses yt-dlp flat-playlist JSON and skips non-video entries", () => {
+    const raw = "[warning] noise\n" + JSON.stringify({
+      entries: [
+        { id: "jNQXAC9IVRw", title: "Me at the zoo", channel: "jawed", duration: 19 },
+        { id: "rFZHOHl-L8A", title: "radio", uploader: "Lofi Girl", duration: null, live_status: "is_live" },
+        { id: "UCSJ4gkVC6NrvII8umztf0Ow", title: "a channel" },
+      ],
+    });
+    const r = parseSearchResults(raw);
+    expect(r.length).toBe(2);
+    expect(r[0]).toEqual({
+      id: "jNQXAC9IVRw",
+      title: "Me at the zoo",
+      channel: "jawed",
+      duration: 19,
+      thumbnail: "https://i.ytimg.com/vi/jNQXAC9IVRw/mqdefault.jpg",
+      url: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      isLive: false,
+    });
+    expect(r[1].channel).toBe("Lofi Girl");
+    expect(r[1].isLive).toBe(true);
+  });
+
+  it("returns an empty list for invalid output", () => {
+    expect(parseSearchResults("")).toEqual([]);
+    expect(parseSearchResults("{not json")).toEqual([]);
+  });
+
+  it("rejects unauthenticated search", async () => {
+    const res = await app.handle(new Request("http://localhost/api/youtube/search?q=test"));
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects empty and too-long queries", async () => {
+    const empty = await app.handle(new Request("http://localhost/api/youtube/search?q=", { headers: { Cookie: cookie } }));
+    expect(empty.status).toBe(400);
+    const long = "a".repeat(SEARCH_MAX_QUERY + 1);
+    const tooLong = await app.handle(new Request(`http://localhost/api/youtube/search?q=${long}`, { headers: { Cookie: cookie } }));
+    expect(tooLong.status).toBe(400);
+  });
+
+  it("ships YouTubeBrowser UI wired into FileManager with locale strings", async () => {
+    const comp = await Bun.file("frontend/src/components/YouTubeBrowser.tsx").text();
+    expect(comp).toContain("/api/youtube/search");
+    expect(comp).toContain('id="youtube-browser"');
+    const fm = await Bun.file("frontend/src/components/FileManager.tsx").text();
+    expect(fm).toContain("<YouTubeBrowser />");
+    for (const lang of ["en", "th"]) {
+      const d = JSON.parse(await Bun.file(`frontend/src/locales/${lang}.json`).text());
+      for (const k of ["ytb_title", "ytb_placeholder", "ytb_btn_search", "ytb_queue", "ytb_notice"]) {
+        expect(d[k]).toBeDefined();
+      }
+    }
   });
 });
 

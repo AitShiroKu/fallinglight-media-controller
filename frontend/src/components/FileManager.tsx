@@ -7,6 +7,7 @@ import { useI18n } from '../services/i18n';
 import CreateFolderModal from './CreateFolderModal';
 import MoveFileModal from './MoveFileModal';
 import YouTubeDownloader from './YouTubeDownloader';
+import YouTubeBrowser from './YouTubeBrowser';
 import {
   Folder,
   FolderPlus,
@@ -536,6 +537,11 @@ export default function FileManager({ onNavigateToPlayer }: FileManagerProps = {
 
             {/* YouTube Downloader Deck */}
             <YouTubeDownloader />
+
+            {/* YouTube Browser: search and download */}
+            <div className="lg:col-span-2">
+              <YouTubeBrowser />
+            </div>
           </div>
         )}
 

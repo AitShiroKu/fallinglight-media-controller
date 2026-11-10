@@ -1,0 +1,9 @@
+post_install() {
+  echo ">> Edit /etc/fallinglight-media-controller.env (set APP_PASS), then:"
+  echo ">>   sudo systemctl enable --now fallinglight-media-controller"
+  echo ">> Open http://<this-machine-ip>:6140"
+}
+
+post_upgrade() {
+  echo ">> Restart to apply: sudo systemctl restart fallinglight-media-controller"
+}

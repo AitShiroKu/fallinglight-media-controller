@@ -5,8 +5,9 @@ import { readdir, stat, unlink, mkdir, readFile, writeFile, exists, rename, rm }
 import { join, extname, resolve, basename } from "node:path";
 
 const PROJECT_ROOT = import.meta.dir.replace(/[/\\]src[/\\]utils$/, "");
-export const UPLOADS_DIR = join(PROJECT_ROOT, "uploads");
-export const DATA_DIR = join(PROJECT_ROOT, "data");
+// FLMC_UPLOADS_DIR / FLMC_DATA_DIR let packaged installs keep user data outside /opt.
+export const UPLOADS_DIR = resolve(process.env.FLMC_UPLOADS_DIR || join(PROJECT_ROOT, "uploads"));
+export const DATA_DIR = resolve(process.env.FLMC_DATA_DIR || join(PROJECT_ROOT, "data"));
 export const SCHEDULES_FILE = join(DATA_DIR, "schedules.json");
 export const SETTINGS_FILE = join(DATA_DIR, "settings.json");
 

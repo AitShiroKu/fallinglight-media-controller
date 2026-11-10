@@ -125,3 +125,31 @@ Server runs at **http://localhost:3000** and listens on **0.0.0.0** for LAN acce
 ---
 
 *Built with ❤ for school PR rooms — FallingLight v1.0.0 Web Edition*
+
+---
+
+## 🔎 YouTube Browser
+
+Open **Files → Tools** to search YouTube for songs or videos, then press **MP3** or **MP4** on a result to download it into the selected folder. Several downloads can run at once and appear in the download queue.
+
+- API: `GET /api/youtube/search?q=<text>&limit=12` (login required, query max 200 chars, limit 1–30)
+- Uses `yt-dlp` (no shell; the query is passed as an argument). Live streams cannot be downloaded.
+- Download only content you own or have permission to use.
+
+## 🐧 Linux Install (Ubuntu / Arch)
+
+**Ubuntu / Debian or Arch (script):**
+```bash
+sudo -S -p '' ./packaging/install.sh          # installs bun, yt-dlp, ffmpeg, then the systemd service
+sudo -S -p '' ./packaging/uninstall.sh        # keeps media/config; add --purge to delete them
+```
+
+**Arch (native package):**
+```bash
+cd packaging/arch && makepkg -si
+sudo -S -p '' systemctl enable --now fallinglight-media-controller
+```
+
+Installed layout: app in `/opt/fallinglight-media-controller`, media and settings in `/var/lib/fallinglight-media-controller`, config in `/etc/fallinglight-media-controller.env` (set `APP_PASS` and `SESSION_SECRET` there). Default port: 6140.
+
+For a manual run, `FLMC_UPLOADS_DIR` and `FLMC_DATA_DIR` override the storage folders.

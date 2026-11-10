@@ -1,0 +1,25 @@
+[Unit]
+Description=FallingLight Media Controller (web server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fallinglight
+Group=fallinglight
+WorkingDirectory=/opt/fallinglight-media-controller
+EnvironmentFile=-/etc/fallinglight-media-controller.env
+Environment=PORT=6140
+Environment=FLMC_UPLOADS_DIR=/var/lib/fallinglight-media-controller/uploads
+Environment=FLMC_DATA_DIR=/var/lib/fallinglight-media-controller/data
+ExecStart=/usr/bin/env bun run src/index.ts
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/fallinglight-media-controller
+
+[Install]
+WantedBy=multi-user.target

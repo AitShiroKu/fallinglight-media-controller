@@ -1,0 +1,41 @@
+# Maintainer: FallingLight Studio
+# Builds from the local checkout: cd packaging/arch && makepkg -si
+pkgname=fallinglight-media-controller
+pkgver=1.1.0
+pkgrel=1
+pkgdesc="Web media controller for school PR rooms, with YouTube search and download"
+arch=('x86_64' 'aarch64')
+url="https://github.com/AitShiroKu/fallinglight-media-controller"
+license=('custom')
+depends=('bun' 'yt-dlp' 'ffmpeg')
+optdepends=('deno: JavaScript runtime used by yt-dlp for some YouTube videos')
+backup=('etc/fallinglight-media-controller.env')
+install=fallinglight-media-controller.install
+options=('!strip' '!debug')
+source=()
+
+_root="$startdir/../.."
+
+build() {
+  cd "$_root/frontend"
+  bun install --frozen-lockfile
+  bun run build
+}
+
+package() {
+  local dest="$pkgdir/opt/$pkgname"
+  install -d "$dest"
+  cp -r "$_root/src" "$_root/public" "$_root/dist" "$dest/"
+  install -m644 "$_root/package.json" "$_root/bun.lock" "$_root/tsconfig.json" "$dest/"
+  (cd "$dest" && bun install --production --frozen-lockfile)
+
+  install -Dm644 "$_root/packaging/$pkgname.service" "$pkgdir/usr/lib/systemd/system/$pkgname.service"
+  install -Dm600 "$_root/packaging/$pkgname.env" "$pkgdir/etc/$pkgname.env"
+  install -d "$pkgdir/usr/lib/sysusers.d" "$pkgdir/usr/lib/tmpfiles.d"
+  echo "u fallinglight - \"FallingLight Media Controller\" /var/lib/$pkgname" > "$pkgdir/usr/lib/sysusers.d/$pkgname.conf"
+  cat > "$pkgdir/usr/lib/tmpfiles.d/$pkgname.conf" <<EOF
+d /var/lib/$pkgname 0755 fallinglight fallinglight -
+d /var/lib/$pkgname/uploads 0755 fallinglight fallinglight -
+d /var/lib/$pkgname/data 0755 fallinglight fallinglight -
+EOF
+}

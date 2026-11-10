@@ -5,11 +5,9 @@
   "btn_login": "Login",
   "btn_logout": "Logout",
   "header_subtitle": "Media Controller",
-
   "tab_player": "Player",
   "tab_schedule": "Schedule",
   "tab_files": "Files",
-
   "no_track": "No Track Loaded",
   "playlist_title": "Playlist",
   "playlist_empty": "Playlist is empty — add tracks to begin",
@@ -18,7 +16,6 @@
   "btn_clear": "Clear",
   "btn_mic": "MIC / PR",
   "btn_mic_active": "ON AIR",
-
   "col_title": "Title",
   "col_loop": "Loop",
   "col_left": "Left",
@@ -31,7 +28,6 @@
   "col_filename": "Filename",
   "col_size": "Size",
   "col_modified": "Modified",
-
   "schedule_title": "Scheduled Playback",
   "no_schedules": "No schedules configured",
   "btn_add_schedule": "Add Schedule",
@@ -41,7 +37,6 @@
   "schedule_recurring": "Recurring",
   "schedule_daily": "Daily",
   "schedule_weekly": "Weekly",
-
   "dialog_add_schedule": "Add New Schedule",
   "dialog_edit_schedule": "Edit Schedule",
   "dialog_add_files": "Select Files to Add",
@@ -55,7 +50,6 @@
   "label_volume": "Volume",
   "label_loop_count": "Loop Count",
   "placeholder_schedule_name": "e.g. Morning Bell",
-
   "day_mon": "Mon",
   "day_tue": "Tue",
   "day_wed": "Wed",
@@ -63,7 +57,6 @@
   "day_fri": "Fri",
   "day_sat": "Sat",
   "day_sun": "Sun",
-
   "files_title": "Media Files",
   "search_files_placeholder": "Search files...",
   "no_search_results": "No matching files found",
@@ -71,12 +64,10 @@
   "drop_zone_text": "Drag & drop files here or click Upload above",
   "no_files": "No files uploaded yet",
   "confirm_delete": "Are you sure you want to delete?",
-
   "btn_cancel": "Cancel",
   "btn_save": "Save",
   "btn_add": "Add",
   "btn_ok": "OK",
-
   "status_ready": "Ready",
   "status_mic_on": "MIC ON — Audio Ducked",
   "status_mic_off": "MIC OFF — Volume Restored",
@@ -109,7 +100,6 @@
   "youtube_error": "Failed to download YouTube media",
   "video_preview_title": "Video Preview",
   "btn_upload_add": "Upload & Add",
-
   "streaming_enable": "Streaming",
   "streaming_disable": "Stop Stream",
   "streaming_waiting": "Waiting...",
@@ -120,7 +110,6 @@
   "modal_exit_title": "PR System Warning",
   "btn_stay_on_page": "Stay on page",
   "btn_confirm_exit": "Confirm Exit",
-
   "col_autonext": "Auto-Next",
   "btn_autonext_on": "Next",
   "btn_autonext_off": "Stop",
@@ -128,7 +117,6 @@
   "tooltip_autonext_off": "Stop playback when this track finishes (click to auto-advance instead)",
   "status_track_ended_stopped": "Media finished (stopped per setting)",
   "label_autonext_default": "Auto-advance to next track by default",
-
   "tab_files_folder": "Folders",
   "folder_root": "Root Folder",
   "btn_new_folder": "New Folder",
@@ -146,7 +134,6 @@
   "drop_zone_target": "Drag & drop files here to upload to:",
   "drop_on_folder_hint": "Drop file here to move into this folder",
   "drop_on_root_hint": "Drop here to move back to Root",
-
   "btn_stream_debug": "Stream Debug",
   "stream_debug_title": "Streaming Diagnostics & Session Recovery",
   "btn_force_reset_stream": "Force Reset & Clear Stuck Sessions",
@@ -158,5 +145,13 @@
   "drop_overlay_text": "Drop files anywhere to upload",
   "btn_download_file": "Download File",
   "collapse_sidebar": "Collapse Sidebar",
-  "expand_sidebar": "Expand Sidebar"
+  "expand_sidebar": "Expand Sidebar",
+  "ytb_title": "YouTube Browser",
+  "ytb_placeholder": "Search songs or videos on YouTube...",
+  "ytb_btn_search": "Search",
+  "ytb_no_results": "No results found",
+  "ytb_search_error": "YouTube search failed",
+  "ytb_queue": "Download queue",
+  "ytb_clear_done": "Clear finished",
+  "ytb_notice": "Download only content you own or have permission to use. Respect YouTube's Terms and copyright."
 }

@@ -5,11 +5,9 @@
   "btn_login": "เข้าสู่ระบบ",
   "btn_logout": "ออกจากระบบ",
   "header_subtitle": "ระบบควบคุมสื่อ",
-
   "tab_player": "เครื่องเล่น",
   "tab_schedule": "ตารางเวลา",
   "tab_files": "ไฟล์",
-
   "no_track": "ไม่มีเพลงที่โหลด",
   "playlist_title": "รายการเพลง",
   "playlist_empty": "รายการเพลงว่าง — เพิ่มเพลงเพื่อเริ่มต้น",
@@ -18,7 +16,6 @@
   "btn_clear": "ล้าง",
   "btn_mic": "ไมค์ / ประชาสัมพันธ์",
   "btn_mic_active": "กำลังออกอากาศ",
-
   "col_title": "ชื่อเพลง",
   "col_loop": "วนซ้ำ",
   "col_left": "เหลือ",
@@ -31,7 +28,6 @@
   "col_filename": "ชื่อไฟล์",
   "col_size": "ขนาด",
   "col_modified": "แก้ไข",
-
   "schedule_title": "การเล่นตามตารางเวลา",
   "no_schedules": "ไม่มีตารางเวลาที่ตั้งไว้",
   "btn_add_schedule": "เพิ่มตารางเวลา",
@@ -41,7 +37,6 @@
   "schedule_recurring": "เล่นตามวัน",
   "schedule_daily": "ทุกวัน",
   "schedule_weekly": "รายสัปดาห์",
-
   "dialog_add_schedule": "เพิ่มตารางเวลาใหม่",
   "dialog_edit_schedule": "แก้ไขตารางเวลา",
   "dialog_add_files": "เลือกไฟล์เพื่อเพิ่ม",
@@ -55,7 +50,6 @@
   "label_volume": "ระดับเสียง",
   "label_loop_count": "จำนวนวนซ้ำ",
   "placeholder_schedule_name": "เช่น กริ่งเช้า",
-
   "day_mon": "จ.",
   "day_tue": "อ.",
   "day_wed": "พ.",
@@ -63,7 +57,6 @@
   "day_fri": "ศ.",
   "day_sat": "ส.",
   "day_sun": "อา.",
-
   "files_title": "ไฟล์สื่อ",
   "search_files_placeholder": "ค้นหาไฟล์...",
   "no_search_results": "ไม่พบไฟล์ที่ค้นหา",
@@ -71,12 +64,10 @@
   "drop_zone_text": "ลากไฟล์มาวางที่นี่ หรือกดปุ่มอัพโหลดด้านบน",
   "no_files": "ยังไม่มีไฟล์ที่อัพโหลด",
   "confirm_delete": "คุณแน่ใจว่าต้องการลบ?",
-
   "btn_cancel": "ยกเลิก",
   "btn_save": "บันทึก",
   "btn_add": "เพิ่ม",
   "btn_ok": "ตกลง",
-
   "status_ready": "พร้อมใช้งาน",
   "status_mic_on": "ไมค์เปิด — เสียงถูกหรี่ลง",
   "status_mic_off": "ไมค์ปิด — คืนระดับเสียงแล้ว",
@@ -109,7 +100,6 @@
   "youtube_error": "ดาวน์โหลดสื่อจาก YouTube ล้มเหลว",
   "video_preview_title": "หน้าต่างแสดงตัวอย่างวิดิโอ",
   "btn_upload_add": "อัพโหลดและเพิ่มเข้าคิว",
-
   "streaming_enable": "เปิดสตรีมมิ่ง",
   "streaming_disable": "ปิดสตรีมมิ่ง",
   "streaming_waiting": "รอเชื่อมต่อ...",
@@ -120,7 +110,6 @@
   "modal_exit_title": "แจ้งเตือนระบบประชาสัมพันธ์",
   "btn_stay_on_page": "ย้อนกลับ (ทำงานต่อ)",
   "btn_confirm_exit": "ยืนยันที่จะออก",
-
   "col_autonext": "เล่นต่อ",
   "btn_autonext_on": "เล่นต่อ",
   "btn_autonext_off": "หยุดเมื่อจบ",
@@ -128,7 +117,6 @@
   "tooltip_autonext_off": "เมื่อเล่นสื่อนี้จบ จะหยุดเล่นทันที (คลิกเพื่อเปลี่ยน)",
   "status_track_ended_stopped": "เล่นสื่อจบแล้ว (หยุดตามที่ตั้งค่าไว้)",
   "label_autonext_default": "เล่นต่อสื่อถัดไปอัตโนมัติ",
-
   "tab_files_folder": "โฟลเดอร์",
   "folder_root": "โฟลเดอร์หลัก",
   "btn_new_folder": "สร้างโฟลเดอร์",
@@ -146,7 +134,6 @@
   "drop_zone_target": "ลากไฟล์มาวางที่นี่เพื่ออัปโหลดลงใน:",
   "drop_on_folder_hint": "วางไฟล์ที่นี่เพื่อย้ายเข้าสู่โฟลเดอร์นี้",
   "drop_on_root_hint": "วางที่นี่เพื่อย้ายกลับโฟลเดอร์หลัก",
-
   "btn_stream_debug": "วินิจฉัยสตรีม",
   "stream_debug_title": "เครื่องมือตรวจสอบ & เคลียร์เซสชันสตรีม",
   "btn_force_reset_stream": "รีเซ็ตและเคลียร์เซสชันค้างทั้งหมด",
@@ -158,5 +145,13 @@
   "drop_overlay_text": "วางไฟล์เพื่ออัปโหลดลงโฟลเดอร์นี้",
   "btn_download_file": "ดาวน์โหลดไฟล์",
   "collapse_sidebar": "หุบแถบเมนู",
-  "expand_sidebar": "ขยายแถบเมนู"
+  "expand_sidebar": "ขยายแถบเมนู",
+  "ytb_title": "ค้นหาจาก YouTube",
+  "ytb_placeholder": "ค้นหาเพลงหรือวิดิโอบน YouTube...",
+  "ytb_btn_search": "ค้นหา",
+  "ytb_no_results": "ไม่พบผลลัพธ์",
+  "ytb_search_error": "ค้นหา YouTube ไม่สำเร็จ",
+  "ytb_queue": "คิวดาวน์โหลด",
+  "ytb_clear_done": "ล้างรายการที่เสร็จแล้ว",
+  "ytb_notice": "ดาวน์โหลดเฉพาะเนื้อหาที่มีสิทธิ์ใช้งาน และเคารพข้อกำหนดของ YouTube และลิขสิทธิ์"
 }
